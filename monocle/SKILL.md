@@ -247,15 +247,24 @@ The sticky bit on these directories stops users from deleting *other people's* f
 5. Look for compounding findings. One finding can make another worse, as when persistence the code installs gives a local privilege escalation a root-executed target, or a forgeable cache undermines the compliance data the tool exists to produce. Explain those in **Cross-cutting notes**.
 6. **Verify every citation before delivering, in two passes.**
    - **Pass 1, before writing:** verify each `file:line` you collected, in one batch: `for n in 33 60 …; do printf '%s: %s\n' $n "$(sed -n "${n}p" file)"; done`.
-   - **Pass 2, after writing:** citations added while drafting drift most. This includes supporting lines, credits, JSON field lines, and refactor anchors; in practice about 1 in 30 was wrong. List every reference in the finished report with ``grep -oE '`[^` ]*:[0-9]+(–[0-9]+)?`' report.md | sort -u`` (matching only backtick-quoted references skips times such as 00:53) and re-check any not covered by pass 1.
+   - **Pass 2, after writing:** citations added while drafting drift most. This includes supporting lines, credits, JSON field lines, and refactor anchors; in practice about 1 in 30 was wrong. List every reference in the finished report with ``grep -oE '`[^` ]*:[0-9]+(–[0-9]+)?`' "$reports/monocle-{target}-{timestamp}.md" | sort -u`` (matching only backtick-quoted references skips times such as 00:53) and re-check any not covered by pass 1.
    - Fix wrong lines with `grep -nF 'snippet' file`. If a line can't be pinned down, cite the function name instead.
 7. **Date- and time-stamp the report.**
    - Get the timestamp from `date '+%Y-%m-%d %H:%M %Z'` (or the session's current date and time when no shell is available) and put it in the header's **Date** field.
    - It records when the analysis ran, not when the code was committed; the SHA or ref covers that.
    - Never guess it from commit history or training data.
-8. **Deliver long reports as a file.**
-   - When the report runs past about 150 lines, write it to a `.md` file in the scratch directory, named `monocle-{target}-{YYYY-MM-DD-HHMM}.md` using the same timestamp as the header (`date '+%Y-%m-%d-%H%M'`). Including the time keeps same-day re-runs from overwriting each other.
-   - In the reply, give the path, the overall risk and recommendation, the findings table, and any notable non-security issue.
+8. **Write the report to `reports/`.**
+   - Always save the full report, whatever its length, to the central reports directory: `$MONOCLE_REPORTS_DIR` if set, otherwise `/Users/danksnelson/Documents/GitHub/dan-snelson/Monocle/reports`. Use this directory regardless of the current working directory or the target's location. Create it if it doesn't exist:
+
+     ```bash
+     reports="${MONOCLE_REPORTS_DIR:-/Users/danksnelson/Documents/GitHub/dan-snelson/Monocle/reports}"
+     mkdir -p "$reports"
+     ```
+
+   - Name the file `monocle-{target}-{YYYY-MM-DD-HHMM}.md`, using the same timestamp as the header (`date '+%Y-%m-%d-%H%M'`). `{target}` is the repo or file basename, lowercased, with anything outside `[a-z0-9._-]` replaced by `-`. Including the time keeps same-day re-runs from overwriting each other; if the name still exists, append `-2`, `-3`, and so on. Never overwrite an existing report.
+   - Keep working files (clones, fetched sources, `semgrep.json`, `semgrep.err`) in the scratch directory. `$reports` holds finished reports only.
+   - If `$reports` can't be created or written (read-only sandbox, path outside the agent's writable roots, no filesystem access), deliver the report inline and say why.
+   - In the reply, give the report's absolute path, the overall risk and recommendation, the findings table, and any notable non-security issue. Don't paste the full report unless the user asks.
 
 ### Output template
 
