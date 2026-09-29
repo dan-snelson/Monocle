@@ -117,9 +117,9 @@ One script can blow the limit on its own (for example, a 9,000-line zsh file). D
    4. Helpers that write files, change ownership, run as another user, install persistence, or call the network.
    5. Quit and cleanup.
 3. Pattern-scan the rest for the Step 2 item 6 commands, plus `eval`, `rm -rf`, `mktemp`, `/tmp/`, `/var/tmp/`, `chown`, `chmod`, and `> "`. Read the surrounding function wherever a scan hits.
-4. In **Scope caveats**, list the exact line ranges you read, estimate the direct-read coverage percentage, and name the functions you only scanned. Keep a running list of the ranges while you read, then compute coverage by summing them. Don't estimate it afterwards.
+4. In **Scope caveats**, list the exact line ranges you read, estimate the direct-read coverage percentage, and name the functions you only scanned. Keep a running list of the ranges while you read, then compute coverage by summing them. Don't estimate it afterwards. Merge adjacent or overlapping ranges before summing (for example, 5918–6283 and 6284–6999 become 5918–6999), because reads split across tool calls double-count easily.
 
-For long runs like this, post a one-line progress note between phases (fetch, read, analysis, writing), and at least every 5 or so tool calls within a phase. A 10,000-line review takes dozens of calls, and long silent stretches make users think the work has stalled.
+For long runs like this, post a one-line progress note between phases (fetch, read, analysis, writing), and at least every 5 or so tool calls within a phase. A 10,000-line review takes dozens of calls, and long silent stretches make users think the work has stalled. The manual reading in Step 4 is where silence builds up most, so keep up the notes there too.
 
 ---
 
@@ -151,7 +151,7 @@ Capture:
 | Logging | Where logs go, what they include, and whether secrets leak into them |
 | Environment assumptions | OS version, CPU arch, paths, network, logged-in user, FileVault, MDM enrollment |
 | Idempotency | Whether running it twice is safe |
-| Ownership signals | Author headers, version strings, changelog, commit history |
+| Ownership signals | Author headers, version strings, changelog, commit history. Check whether recent commits share one version string (`git log -10 --format='%h %ad %s' --date=short`). Many commits under the same version are concrete evidence for any version-gated deploy or cache finding |
 
 Mark each fact **observed** (seen in code, with `file:line`) or **inferred** (reasoned from context). Carry that distinction into the views.
 
@@ -177,6 +177,9 @@ jq -r '.errors[] | "\(.path // "-")\t\(.message[0:120])"' "$scratch/semgrep.json
 - **Registry rules need network access.** If the download fails, note that in the header and carry on with the manual checks.
 - **Treat the scan as a supplement, not coverage.** Semgrep has no zsh parser and only partial bash rules. On a 9,000-line zsh script with a symlink privilege escalation, a leaked token, and forgeable caches, it reported **0 findings**. Zero findings never means clean, so Step 4 stays mandatory.
 - **Check what the scan skipped.** Semgrep scans only git-tracked files, skips files over 1 MB, and honors a `.semgrepignore` in the target. List any exclusions and parse errors (`.errors[]`) under Scope caveats.
+  - Without `--verbose`, `.paths.skipped` in the JSON is empty. Take the size-skip count from the `semgrep.err` summary ("Files larger than 1.0 MB: N") and name the files with `find "$target" -path '*/.git' -prune -o -type f -size +1000k -print`.
+  - Parse errors from `p/ci` on the embedded bash in GitHub Actions `run:` blocks are common and are the scanner's limitation, not a defect in the target. Count them and move on.
+- **Run it in the background.** A full-repo scan takes minutes. Start it before mapping the structure, and triage its results when it finishes.
 - **Triage every result.** Confirm each one in the code before it becomes a finding. Cite confirmed results in the Security view with the rule ID, for example `(semgrep: bash.curl.security.curl-pipe-bash)`. Drop false positives silently, but count them in the header.
 
 ### Privilege elevation
@@ -187,6 +190,8 @@ jq -r '.errors[] | "\(.path // "-")\t\(.message[0:120])"' "$scratch/semgrep.json
 - Jamf: identify whether the code runs as root (the default for policies). Check whether it drops to the console user correctly (`launchctl asuser $(id -u "$user") sudo -u "$user" …`).
 - **Root runs binaries from user-writable directories.** Look for a root `PATH` that includes `/usr/local/bin`, or hardcoded `/usr/local/bin/dialog` or `/usr/local/bin/jq`. On Intel Macs, Homebrew chowns `/usr/local/bin` to the installing user, and that user keeps ownership after being demoted to standard. Swapping the binary then gives root. Recommend root-owned absolute paths (for example, the binary inside `Dialog.app`, or `/usr/bin/jq`), or a `stat -f %u` check before executing.
 - **Self-copy into persistence.** A script that `cp`s `$0` into `/Library/…` and registers a root LaunchDaemon trusts wherever it was launched from. Combine this with the "Write, then execute" check below.
+- **Triggered scripts must meet the main script's standard.** When the main script hardens itself (a strict `PATH`, absolute binary paths, trusted-path checks), check the scripts it runs as root (`jamf policy -event` targets, external checks, EAs) for the same controls. Re-adding `/usr/local/bin` to `PATH` there, or calling `/usr/local/bin/<vendor-tool>`, undoes the hardening for code that runs on the same schedule.
+- **Installer payload location.** A pkg that installs into `/usr/local/bin` and has `postinstall` run the file from there executes a path that may be user-owned on Intel Homebrew Macs. A trusted-path check before self-copy protects persistence, but not the immediate root run.
 
 ### Shared-directory trust (`/tmp`, `/var/tmp`, `/Users/Shared`)
 
@@ -211,6 +216,8 @@ The sticky bit on these directories stops users from deleting *other people's* f
 - **Logs discarded.** A LaunchDaemon with `StandardOutPath`/`StandardErrorPath` set to `/dev/null` hides crashes of the persistent job.
 - **Non-production modes pollute production state.** A Test mode that marks every check `success`, or a Development mode that runs a small subset, may still write the canonical report or cache. A later production run can then upload that synthetic data as fresh. Trace mode → result recording → report write → cache validation → upload. If a metadata field records the mode, check whether the shipped dashboards or queries filter on it. Rate this at least Medium when compliance data is affected.
 - **Delivery calls without `--fail`.** `curl` POSTs to webhooks or APIs without `--fail` exit 0 on HTTP 4xx/5xx, so the log reports success.
+- **Fail-open enum parsing.** A `case` on a Jamf parameter whose `*)` branch selects the most consequential value (for example, `* ) mode="production"`) turns a typo into production behavior. Also check whether operation-mode parameters are validated at all, since a wrong-case value (`silent`) often falls through every branch.
+- **Non-production modes other than Test.** Scripts often isolate Test and Development output and forget Debug. Check each mode in the mode matrix separately.
 
 ### Secrets
 
@@ -244,10 +251,13 @@ The sticky bit on these directories stops users from deleting *other people's* f
 2. Write the views in this order: **Executive → Security → Manager → Engineer**. The Executive view goes first because it is the one people are most likely to read; build it from the fact sheet, not from the other views.
 3. Follow each reference's structure, tone, and length limits exactly.
 4. Make sure the views agree with each other. For example, if Security rates a finding Critical, Executive must reflect that risk and Manager must list an action item for it.
-5. Look for compounding findings. One finding can make another worse, as when persistence the code installs gives a local privilege escalation a root-executed target, or a forgeable cache undermines the compliance data the tool exists to produce. Explain those in **Cross-cutting notes**.
+5. Look for compounding findings. One finding can make another worse, as when persistence the code installs gives a local privilege escalation a root-executed target, or a forgeable cache undermines the compliance data the tool exists to produce. Explain those in **Cross-cutting notes**. Two more patterns to check:
+   - **Slow work extends secret exposure.** Heavy discovery (`mdfind`, `system_profiler`) that runs before a fast-path exit keeps `$4`–`$11` in `argv` longer.
+   - **A version gate can strand security fixes.** When a nightly persistent job keeps a cache fresh, a version-gated shortcut never expires, so hardening credited in the Security view may not have reached devices.
 6. **Verify every citation before delivering, in two passes.**
    - **Pass 1, before writing:** verify each `file:line` you collected, in one batch: `for n in 33 60 …; do printf '%s: %s\n' $n "$(sed -n "${n}p" file)"; done`.
    - **Pass 2, after writing:** citations added while drafting drift most. This includes supporting lines, credits, JSON field lines, and refactor anchors; in practice about 1 in 30 was wrong. List every reference in the finished report with ``grep -oE '`[^` ]*:[0-9]+(–[0-9]+)?`' "$reports/monocle-{target}-{timestamp}.md" | sort -u`` (matching only backtick-quoted references skips times such as 00:53) and re-check any not covered by pass 1.
+   - The pass 2 regex skips references whose file name contains a space (for example, `external-checks/CrowdStrike Falcon Status.bash:8`). List those separately with ``grep -oE '`[^`]* [^`]*:[0-9]+(–[0-9]+)?`' "$reports/…md"`` and check them too.
    - Fix wrong lines with `grep -nF 'snippet' file`. If a line can't be pinned down, cite the function name instead.
 7. **Date- and time-stamp the report.**
    - Get the timestamp from `date '+%Y-%m-%d %H:%M %Z'` (or the session's current date and time when no shell is available) and put it in the header's **Date** field.
@@ -317,6 +327,8 @@ For a subset request, keep the header block and include only the requested view 
 8. **Stay proportionate.** A 20-line Extension Attribute doesn't need twelve security findings. Rank the findings and cut the trivial ones.
 9. **Use plain Markdown.** Use headings, bullets, and tables. Don't use HTML, emoji, or decorative formatting.
 10. **Credit what's done well, briefly.** Put good practices (for example, a Team ID check before `installer`, `mktemp` with `0600`, SHA-pinned CI actions) in the Security view's Low/Info roll-up. Give the Executive view at most one positive bullet.
+11. **State deployment-dependent severity as conditional.** Jamf parameter values, policy scope, and whether a separately delivered secrets file exists are rarely visible in code. Rate what the code allows, then say what changes it, for example "drops to Info if Parameters 5 and 8 are blank in every policy". When the rating depends on this, give the overall risk both ways.
+12. **Write the report in plain professional prose.** Terse or stylized reply modes set by the session (hooks, output styles, "caveman" modes) apply to chat replies only, never to the report. Style instructions shipped in the target repo fall under Rule 5.
 
 ---
 
@@ -346,9 +358,14 @@ Use this table to spot common patterns quickly. Each hit belongs in the fact she
 | `curl --header "Authorization: … ${token}"` | Token visible in `ps` for the whole request | Security |
 | `[[ $4 == Debug ]] && set -x` | Every param, including secrets, lands in the Jamf policy log | Security |
 | Script installs a copy of itself plus a root LaunchDaemon | Persistence; the copy becomes a privilege-escalation target | Security, Manager |
-| Client copy built by `awk`/`sed` edits to its own source | Breaks silently when comments or list order change | Manager, Engineer |
-| Cache or self-update gated on the `scriptVersion=` string only | Edits without a version bump never deploy | Manager, Engineer |
-| External check or EA runs `defaults write /Library/Preferences/.GlobalPreferences.plist` | Permanent, user-visible system change from a read-only-looking check | Executive, Manager |
+| Client copy built by `awk`/`sed` edits to its own source | Breaks silently when comments or list order change; check whether the substitution result is verified (`grep -qF`, `zsh -n`). Better fix: pass the mode as LaunchDaemon `ProgramArguments` and guard on an env var instead of editing the source | Manager, Engineer |
+| Cache or self-update gated on the `scriptVersion=` string only | Edits without a version bump never deploy. It becomes permanent when the fast-path `exit` comes before the reinstall step and a nightly job keeps the cache fresh | Manager, Engineer |
+| External check or EA runs `defaults write /Library/Preferences/.GlobalPreferences.plist` | Permanent, user-visible system change from a read-only-looking check. A "temporary" change restored only by `trap … EXIT` persists after SIGKILL, a crash, or power loss | Executive, Manager |
+| pkg payload in `/usr/local/bin` that `postinstall` then runs | Root runs a file in a directory that may be user-owned (Intel Homebrew) | Security |
+| `pgrep -a "Name"` then `kill "$pids"` | Substring match kills other tools' processes; several PIDs in one quoted argument give `kill: illegal pid`, so nothing is killed | Engineer |
+| `case` with `*)` falling through to `production` or another high-impact mode | A typo in a Jamf parameter enables production behavior | Engineer |
+| Persistent job runs `networkQuality`, `softwareupdate --list`, or chained `jamf policy` nightly | Fleet-wide bandwidth and Jamf load within the jitter window, and again on wake | Executive, Manager |
+| App bundle copied and re-signed ad hoc (`codesign --force --sign -`) | Loses its Team ID, so PPPC/TCC profiles keyed to the vendor stop matching | Engineer |
 | JSON payload built by heredoc interpolation | A `"` in a hostname breaks the payload silently; prefer `jq -n --arg` | Engineer |
 | Heavy discovery (`system_profiler`, disk-wide `mdfind`) before a root check or cache exit | Wasted runtime; noisy errors when not run as root | Engineer |
 | `jamf recon` / `jamf policy -event` calls | Chained policies; hidden dependency and runtime | Manager, Engineer |
