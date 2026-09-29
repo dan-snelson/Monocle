@@ -70,7 +70,11 @@ Examples:
 
 All four views are produced by default. To get a subset, ask for it: "just the executive and manager views".
 
-Every report is saved to one central directory, `reports/` at the root of this repo, as `monocle-{target}-{YYYY-MM-DD-HHMM}.md` (the directory is created if missing). The default path is set in `monocle/SKILL.md`, Step 5; set `MONOCLE_REPORTS_DIR` to use a different location. The reply gives the path, the Monocle Score, the overall risk and recommendation, and the findings table. If the directory can't be written, the report comes back inline instead.
+Every report is saved to one central directory as `monocle-{target}-{YYYY-MM-DD-HHMM}.md`: `$MONOCLE_REPORTS_DIR` if set, otherwise `~/monocle-reports` (the directory is created if missing). Reports contain security findings, so keep them out of version control. If you point `MONOCLE_REPORTS_DIR` inside a git repo, gitignore it; this repo's `.gitignore` already excludes `/reports/`. For example:
+
+```bash
+export MONOCLE_REPORTS_DIR="$HOME/Documents/Monocle/reports"
+``` The reply gives the path, the Monocle Score, the overall risk and recommendation, and the findings table. If the directory can't be written, the report comes back inline instead.
 
 ### Monocle Score
 
