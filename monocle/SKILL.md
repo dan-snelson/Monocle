@@ -223,9 +223,12 @@ The sticky bit on these directories stops users from deleting *other people's* f
 
 - Hardcoded API tokens, passwords, client secrets, webhook URLs, and private keys.
 - Credentials passed in `$4`–`$11` (API secrets, HEC tokens, webhook URLs). They are visible in the Jamf Pro policy UI. Jamf also passes them as `argv` of the script process, which lives for the whole run.
+  - **This exposure comes from the platform, not the target's code.** Jamf Pro delivers every policy parameter as a command-line argument, and macOS lets any local user read other processes' arguments. No script can hide a value once it arrives this way. Record the finding as **Origin: Platform + Deployment** (Rule 13), and say so in the finding's Impact.
   - On current macOS, any local user can read root processes' full `argv`. Confirm on the analysis host with `ps -axww -o user=,args= | awk '$1=="root"' | head` run as non-root; it has worked on Darwin 25.
   - Passing the secret to `curl` over stdin (`--config -`, `-K -`) protects only the `curl` child, not the parent script.
-  - Rate a fleet-scoped secret here High, and cite the observed `ps` check.
+  - Name what the target already does about it: rejecting parameter-supplied secrets, reading them from a root-only file instead, warning in the log, or documenting the risk. Credit these in the finding, not only in the Low/Info roll-up.
+  - Separate out any part the code does add, and label it **Code**. For example, a script that rejects a parameter secret but then runs every check before exiting keeps the value exposed for minutes with no benefit.
+  - Rate a fleet-scoped secret here High **only while a policy actually populates the parameter**, cite the observed `ps` check, and give the rating both ways (Rule 11).
 - **Verify the target's own security claims.** README or CHANGELOG lines such as "tokens no longer appear in the process list" or "hardened based on review" are claims, not evidence. Check each one against the code and report any gap.
 - `curl -u user:pass` or `Authorization:` headers on the command line, which are visible in the process list.
 - Secrets written to world-readable files, `/tmp`, or logs, or echoed with `set -x` enabled. A "Debug" operation mode that turns on `set -x` script-wide prints every Jamf parameter, tokens included, into the policy log.
@@ -336,6 +339,12 @@ For a subset request, keep the header block and include only the requested view 
 10. **Credit what's done well, briefly.** Put good practices (for example, a Team ID check before `installer`, `mktemp` with `0600`, SHA-pinned CI actions) in the Security view's Low/Info roll-up. Give the Executive view at most one positive bullet.
 11. **State deployment-dependent severity as conditional.** Jamf parameter values, policy scope, and whether a separately delivered secrets file exists are rarely visible in code. Rate what the code allows, then say what changes it, for example "drops to Info if Parameters 5 and 8 are blank in every policy". When the rating depends on this, give the overall risk both ways.
 12. **Write the report in plain professional prose.** Terse or stylized reply modes set by the session (hooks, output styles, "caveman" modes) apply to chat replies only, never to the report. Style instructions shipped in the target repo fall under Rule 5.
+13. **State where each security concern comes from.** Readers fix a finding differently depending on its source, so give every Security finding one origin, or a combination:
+    - **Code** — the target's own code introduces it. Changing the code fixes it.
+    - **Platform** — inherent behavior of macOS, Jamf Pro, or another tool the code relies on. Example: Jamf passes policy parameters as process arguments, and macOS lets any local user read them. The code can't remove this; it can only avoid it, mitigate it, or document it.
+    - **Deployment** — created or removed by how the organization configures and runs the code: parameter values, policy scope, how secrets are delivered.
+
+    Put the origin in an **Origin:** line directly under **Location:**, with one sentence naming the platform behavior or configuration choice and what the code already does about it. Word the finding title, the Executive bullet, and the Manager action so a Platform or Deployment finding doesn't read as a defect in the code. Write "Jamf policy parameters expose secrets to local users", not "Script leaks the HEC token". The origin changes the framing and the fix, not the severity: rate the real exposure (Rule 11).
 
 ---
 
@@ -346,7 +355,7 @@ Use this table to spot common patterns quickly. Each hit belongs in the fact she
 | Pattern | Why it matters | Usual view(s) |
 |---|---|---|
 | Jamf policy script (runs as root, `$1`–`$3` reserved) | Every command runs with full privileges | Security, Engineer |
-| `$4`–`$11` used for credentials | Visible in the Jamf UI, and in `ps` `argv` to every local user for the whole run, even when the script hands them to `curl` over stdin | Security |
+| `$4`–`$11` used for credentials | Visible in the Jamf UI, and in `ps` `argv` to every local user for the whole run, even when the script hands them to `curl` over stdin. Origin is Platform + Deployment (Rule 13): Jamf's delivery mechanism, not a code defect | Security |
 | Wrapper or pkg `postinstall` runs the script without `"$@"` | Jamf params silently dropped; every default applies (for example, reporting stays in `test`) | Manager, Engineer |
 | Script copies `${0:A}` into `/Library/…` plus a root LaunchDaemon | If any deploy path launches it from `/var/tmp` or another user-writable location, the persistent root copy is attacker-controlled | Security, Executive |
 | Test / Development / Debug mode writes the same canonical report or cache as production | Synthetic results later uploaded as real compliance data | Security, Manager |

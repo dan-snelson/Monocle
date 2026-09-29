@@ -34,6 +34,7 @@ Use exactly this structure:
 
 #### S1 — {Title}  ·  **{Severity}**
 - **Location:** `file:line` (or function name)
+- **Origin:** {Code | Platform | Deployment, or a combination} — {one sentence: the platform behavior or configuration choice involved, and what the code already does about it} (see SKILL.md Rule 13)
 - **Evidence:** `{short code quote, secrets redacted}`
 - **Impact:** {What an attacker or failure can achieve, and against what}
 - **Fix:** {Specific change — command, flag, or pattern to use instead}
