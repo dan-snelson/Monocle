@@ -247,6 +247,13 @@ The sticky bit on these directories stops users from deleting *other people's* f
 
 ## Step 5 — Write the views
 
+Before writing, check the reports directory for an existing Monocle report on the same target:
+
+- If a prior report has the same target and ref/SHA, treat it as a checklist and draft aid only. Do not treat it as current evidence until you have re-run the input classification, git status, ignored/local-file check, automated scan or its documented failure path, and citation verification against the current checkout.
+- If the target ref/SHA or working tree status differs, treat the prior report as historical context only. Rebuild the fact sheet from the current target.
+- If the new report would differ only by timestamp, tell the user that the previous report already covers the same clean ref and give its path instead of creating a duplicate, unless they explicitly asked for a fresh timestamped rerun. If they did ask for a rerun, state in the header that it is a rerun of the same ref and summarize what was revalidated.
+- Never copy a previous report into a new file without a fresh citation pass. A copied report with only the Date changed is stale evidence.
+
 1. Load the reference file for each view you will write. Load them one at a time, as you write.
 2. Write the views in this order: **Executive → Security → Manager → Engineer**. The Executive view goes first because it is the one people are most likely to read; build it from the fact sheet, not from the other views.
 3. Follow each reference's structure, tone, and length limits exactly.
