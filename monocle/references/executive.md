@@ -26,6 +26,8 @@ Use exactly this structure:
 - {Bullet 3}
 - {… up to 6 bullets total}
 
+**Monocle Score:** {n}/100 ({band}){, or {n2}/100 ({band2}) if {plain-language condition}}
+
 **Recommendation:** {Approve | Approve with conditions | Hold | Do not run} — {one sentence explaining why, plus the conditions if any.}
 ```
 
@@ -37,6 +39,7 @@ Rules:
 - **Quantify when possible.** "All managed Macs", "about 30 seconds per device", "requires a restart", "one person maintains it".
 - **Neutral, confident tone.** Don't be alarmist, and don't hedge the point away. Use "could" only for real uncertainty.
 - **One recommendation.** Always include one. Never write "it depends" without saying on what.
+- **Monocle Score line.** Copy the score and band from the report header (SKILL.md, Step 5, Monocle Score). Leave the breakdown out of this view; it has its own section. Write any condition in plain language. The score line doesn't count toward the 3–6 bullets.
 
 Recommendation levels:
 
@@ -105,6 +108,8 @@ Why it's weak: it describes mechanism instead of purpose, uses jargon, makes vag
 - **Needs internet and one download site to be available.** If that site is down, setup stalls for new hires on day one.
 - **Maintained by one person.** No documentation or tests exist outside their knowledge.
 
+**Monocle Score:** 32/100 (Poor)
+
 **Recommendation:** Approve with conditions — remove the stored password and fix the false "success" reporting before using it for the next hiring wave.
 ```
 
@@ -116,6 +121,8 @@ Why it's weak: it describes mechanism instead of purpose, uses jargon, makes vag
 - **Low risk.** It only reads information and changes nothing on the device.
 - **Runs in under a second, invisibly to users.**
 - **May report "unknown" on desktop Macs,** which have no battery. That's expected, not an error.
+
+**Monocle Score:** 100/100 (Excellent)
 
 **Recommendation:** Approve — no changes needed.
 ```

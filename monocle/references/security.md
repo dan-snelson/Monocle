@@ -101,6 +101,8 @@ Adjust severity for context:
 
 Overall risk equals the highest finding severity, unless you justify otherwise in one sentence.
 
+Severities drive the Monocle Score (SKILL.md, Step 5, Monocle Score): Critical −40, High −20, Medium −8, Low −3, Info 0. Info findings are observations and cost nothing. Rate each finding on its merits, never to reach a target score.
+
 ---
 
 ## Good vs weak examples

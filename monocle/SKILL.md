@@ -1,6 +1,6 @@
 ---
 name: monocle
-description: Inspect scripts or small repos and produce four audience-specific summaries — Executive (business impact & risk), Security (threat surface & privileges), Manager (ownership & change risk), Engineer (logic & edge cases). Trigger on “monocle this”, “monocle review”, “give me the executive/security/manager/engineer view”, “summarize this script for stakeholders”, or when the user pastes a GitHub URL or attaches a script/repo and asks for multi-audience analysis. Supports shell, Python, AppleScript, and common Jamf/macOS automation scripts.
+description: Inspect scripts or small repos and produce four audience-specific summaries — Executive (business impact & risk), Security (threat surface & privileges), Manager (ownership & change risk), Engineer (logic & edge cases) — plus a 0–100 Monocle Score (100 = no issues). Trigger on “monocle this”, “monocle review”, “give me the executive/security/manager/engineer view”, “summarize this script for stakeholders”, or when the user pastes a GitHub URL or attaches a script/repo and asks for multi-audience analysis. Supports shell, Python, AppleScript, and common Jamf/macOS automation scripts.
 ---
 
 # Monocle
@@ -13,6 +13,8 @@ Monocle reads a script or small repo once and writes four summaries of it. Each 
 | Security  | Security / risk reviewers  | What can this touch, with what privileges, and how can it be abused? |
 | Manager   | Team lead, service owner   | Who owns this, how fragile is it, and what must happen next? |
 | Engineer  | Maintainer, reviewer       | How does it actually work, where does it break, and how do we fix it? |
+
+Every report also carries a **Monocle Score** from 0 to 100, where 100 means no issues were found. Step 5 defines how to compute it.
 
 Detailed guidance for each view is in `references/`. Load a reference file only when you are writing that view.
 
@@ -256,24 +258,26 @@ Before writing, check the reports directory for an existing Monocle report on th
 - If the target ref/SHA or working tree status differs, treat the prior report as historical context only. Rebuild the fact sheet from the current target.
 - If the new report would differ only by timestamp, tell the user that the previous report already covers the same clean ref and give its path instead of creating a duplicate, unless they explicitly asked for a fresh timestamped rerun. If they did ask for a rerun, state in the header that it is a rerun of the same ref and summarize what was revalidated.
 - Never copy a previous report into a new file without a fresh citation pass. A copied report with only the Date changed is stale evidence.
+- When a prior report covers a different ref of the same target, give the score change in the new report's **Monocle Score** header line, for example "up from 48 at `3e7bb34`". Recompute the prior score with the current weights if the prior report predates the Monocle Score or used different weights, and say so.
 
 1. Load the reference file for each view you will write. Load them one at a time, as you write.
 2. Write the views in this order: **Executive → Security → Manager → Engineer**. The Executive view goes first because it is the one people are most likely to read; build it from the fact sheet, not from the other views.
 3. Follow each reference's structure, tone, and length limits exactly.
-4. Make sure the views agree with each other. For example, if Security rates a finding Critical, Executive must reflect that risk and Manager must list an action item for it.
+4. Make sure the views agree with each other. For example, if Security rates a finding Critical, Executive must reflect that risk and Manager must list an action item for it. The Monocle Score band must also agree with the Security view's Overall risk and the Executive Recommendation.
 5. Look for compounding findings. One finding can make another worse, as when persistence the code installs gives a local privilege escalation a root-executed target, or a forgeable cache undermines the compliance data the tool exists to produce. Explain those in **Cross-cutting notes**. Two more patterns to check:
    - **Slow work extends secret exposure.** Heavy discovery (`mdfind`, `system_profiler`) that runs before a fast-path exit keeps `$4`–`$11` in `argv` longer.
    - **A version gate can strand security fixes.** When a nightly persistent job keeps a cache fresh, a version-gated shortcut never expires, so hardening credited in the Security view may not have reached devices.
-6. **Verify every citation before delivering, in two passes.**
+6. **Compute the Monocle Score** from the finished findings, as described in **Monocle Score** below. Put it in the header and in the score section of the report.
+7. **Verify every citation before delivering, in two passes.**
    - **Pass 1, before writing:** verify each `file:line` you collected, in one batch: `for n in 33 60 …; do printf '%s: %s\n' $n "$(sed -n "${n}p" file)"; done`.
    - **Pass 2, after writing:** citations added while drafting drift most. This includes supporting lines, credits, JSON field lines, and refactor anchors; in practice about 1 in 30 was wrong. List every reference in the finished report with ``grep -oE '`[^` ]*:[0-9]+(–[0-9]+)?`' "$reports/monocle-{target}-{timestamp}.md" | sort -u`` (matching only backtick-quoted references skips times such as 00:53) and re-check any not covered by pass 1.
    - The pass 2 regex skips references whose file name contains a space (for example, `external-checks/CrowdStrike Falcon Status.bash:8`). List those separately with ``grep -oE '`[^`]* [^`]*:[0-9]+(–[0-9]+)?`' "$reports/…md"`` and check them too.
    - Fix wrong lines with `grep -nF 'snippet' file`. If a line can't be pinned down, cite the function name instead.
-7. **Date- and time-stamp the report.**
+8. **Date- and time-stamp the report.**
    - Get the timestamp from `date '+%Y-%m-%d %H:%M %Z'` (or the session's current date and time when no shell is available) and put it in the header's **Date** field.
    - It records when the analysis ran, not when the code was committed; the SHA or ref covers that.
    - Never guess it from commit history or training data.
-8. **Write the report to `reports/`.**
+9. **Write the report to `reports/`.**
    - Always save the full report, whatever its length, to the central reports directory: `$MONOCLE_REPORTS_DIR` if set, otherwise `/Users/danksnelson/Documents/GitHub/dan-snelson/Monocle/reports`. Use this directory regardless of the current working directory or the target's location. Create it if it doesn't exist:
 
      ```bash
@@ -284,7 +288,48 @@ Before writing, check the reports directory for an existing Monocle report on th
    - Name the file `monocle-{target}-{YYYY-MM-DD-HHMM}.md`, using the same timestamp as the header (`date '+%Y-%m-%d-%H%M'`). `{target}` is the repo or file basename, lowercased, with anything outside `[a-z0-9._-]` replaced by `-`. Including the time keeps same-day re-runs from overwriting each other; if the name still exists, append `-2`, `-3`, and so on. Never overwrite an existing report.
    - Keep working files (clones, fetched sources, `semgrep.json`, `semgrep.err`) in the scratch directory. `$reports` holds finished reports only.
    - If `$reports` can't be created or written (read-only sandbox, path outside the agent's writable roots, no filesystem access), deliver the report inline and say why.
-   - In the reply, give the report's absolute path, the overall risk and recommendation, the findings table, and any notable non-security issue. Don't paste the full report unless the user asks.
+   - In the reply, give the report's absolute path, the Monocle Score, the overall risk and recommendation, the findings table, and any notable non-security issue. Don't paste the full report unless the user asks.
+
+### Monocle Score
+
+The Monocle Score summarizes the whole report in one number from 0 to 100. A score of 100 means no issues were found. Use it to compare runs, releases, and targets. Derive it from the findings only: never adjust it by judgment, and never soften or inflate a finding to move it.
+
+**Deductions.** Start at 100 and subtract points for each distinct issue. The score can't go below 0.
+
+| Issue | Deduction |
+|---|---|
+| Critical Security finding | 40 |
+| High Security finding | 20 |
+| Medium Security finding | 8 |
+| Low Security finding | 3 |
+| Info Security finding | 0 (an observation, not an issue) |
+| Non-security issue | 2 each, 20 at most in total |
+
+- **Security findings** are the rows of the Security view's findings table. A single "Low / Info" roll-up bullet counts as one Low if it names a real gap. It counts as zero if it only credits good practice.
+- **Non-security issues** are the distinct Manager fragility hotspots and Engineer footguns or unhandled edge cases that aren't already Security findings. Count each underlying problem once, even when several views mention it. For example, a fail-open parser that appears as a Security finding, a Manager hotspot, an Engineer footgun, and an edge case counts once, at its Security weight.
+- **Don't count** action items, refactor suggestions, or dependencies. They restate issues or describe context.
+
+**Caps.** One serious finding must not be hidden by an otherwise clean report:
+
+- Any Critical finding caps the score at 39.
+- Any High finding caps the score at 69.
+- Any Medium finding caps the score at 89.
+
+**Bands.**
+
+| Score | Band |
+|---|---|
+| 90–100 | Excellent |
+| 70–89 | Good |
+| 50–69 | Fair |
+| 25–49 | Poor |
+| 0–24 | Critical |
+
+**Conditional severity.** When a finding's severity depends on deployment (Rule 11), compute the score both ways and give both, for example "55/100 (Fair), or 75/100 (Good) if Parameters 5 and 8 are blank in every policy". Use the rating that holds for the code as deployed today as the headline number. If today's deployment is unknown, use the worse rating as the headline.
+
+**Consistency.** Because of the caps, the band follows from the Security view's Overall risk: Critical gives a score of 39 or lower, High 69 or lower, Medium 89 or lower, and only Low reaches Excellent. Check that the Recommendation fits as well. Excellent with "Hold" or "Do not run", or Good or better alongside a Critical finding, means a severity or the recommendation is wrong. In that case, recheck the severities and the recommendation rather than changing the score.
+
+**Worked example.** Take a report with S1 High (conditional), S2 Medium, S3 Medium, S4 Low, and S5 Info, plus three non-security issues: LaunchDaemon logs sent to `/dev/null`, a self-editing install path, and `eval` in a local deploy helper. The deductions are 20 + 8 + 8 + 3 + 0 = 39 for the Security findings and 3 × 2 = 6 for the non-security issues, so 100 − 45 = **55 (Fair)**. The High cap of 69 doesn't bind. If S1 drops to Info because the parameters are blank, the score is 100 − 25 = **75 (Good)**.
 
 ### Output template
 
@@ -297,8 +342,23 @@ Use this layout for the full report. Keep all headings, even when a section is s
 **Files analyzed:** {n} — {list, or top 10 + "and N more"}
 **Automated scan:** {semgrep {version} — {rulesets} — {n} results ({m} confirmed), {e} parse errors, {k} files skipped (size / untracked) | "semgrep not installed" | "registry unreachable"}
 **Scope caveats:** {skipped files, unfetchable deps, assumptions — or "None"}
+**Monocle Score:** {n}/100 ({band}) — {basis, e.g. "1 High (conditional), 2 Medium, 1 Low, 3 non-security"}{, or {n2}/100 ({band2}) if {condition}}{; up/down from {prior} at {prior ref}}
 
 ---
+
+## Monocle Score
+
+| Source | IDs | Count | Each | Deduction |
+|---|---|---|---|---|
+| Critical | {S…} | {n} | 40 | {n×40} |
+| High | {S…} | {n} | 20 | {n×20} |
+| Medium | {S…} | {n} | 8 | {n×8} |
+| Low | {S…} | {n} | 3 | {n×3} |
+| Info | {S…} | {n} | 0 | 0 |
+| Non-security | {short names} | {n} | 2 (max 20) | {min(n×2, 20)} |
+
+**Total:** 100 − {deductions} = {raw}{; capped at {cap} by {severity}} → **{n}/100 ({band})**
+{If conditional: one line with the alternate total and the condition that produces it.}
 
 ## Executive View
 {per references/executive.md}
@@ -318,7 +378,7 @@ Use this layout for the full report. Keep all headings, even when a section is s
 {Optional. Only for issues that span views or need a decision. Omit the section if there is nothing to add.}
 ```
 
-For a subset request, keep the header block and include only the requested view sections.
+For a subset request, keep the header block and the Monocle Score section, and include only the requested view sections. Compute the score from the full analysis (Steps 1–4 always run), not from the views you wrote.
 
 ---
 
@@ -333,7 +393,7 @@ For a subset request, keep the header block and include only the requested view 
    - Report benign agent tooling (style hooks, coding guidelines) as one Info line.
    - Hooks that run commands on agent session start are worth naming, because they execute on every contributor's machine.
 6. **Redact secrets.** Show at most the first 4 characters. Never repeat a full credential.
-7. **Don't pad.** If a view has nothing significant to report, say so in one line ("No privilege elevation observed.") and move on. Don't fill space with generic best practices.
+7. **Don't pad.** If a view has nothing significant to report, say so in one line ("No privilege elevation observed.") and move on. Don't fill space with generic best practices. The same applies to the Monocle Score: don't invent minor issues to lower it, and don't leave out real ones to raise it.
 8. **Stay proportionate.** A 20-line Extension Attribute doesn't need twelve security findings. Rank the findings and cut the trivial ones.
 9. **Use plain Markdown.** Use headings, bullets, and tables. Don't use HTML, emoji, or decorative formatting.
 10. **Credit what's done well, briefly.** Put good practices (for example, a Team ID check before `installer`, `mktemp` with `0600`, SHA-pinned CI actions) in the Security view's Low/Info roll-up. Give the Executive view at most one positive bullet.
