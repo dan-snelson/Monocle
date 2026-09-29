@@ -98,10 +98,12 @@ Adjust severity for context:
 - **Raise** it one level when the code runs fleet-wide by default (a Jamf policy scoped to All Computers, or a pkg in the enrollment prestage).
 - **Lower** it one level when the vulnerable path requires admin access that already implies equivalent power. Say so explicitly.
 - Rate **silent failures in security controls** at least Medium. Examples: a FileVault enforcement script that exits 0 on error, or a firewall-enable step whose failure is swallowed.
+- **Don't rate intended capabilities.** A documented, admin-gated destructive operation (EDR removal, data deletion, app removal) is not a finding (SKILL.md Rule 14). A blank-parameter default that offers everything is a Low secure-default gap, with the misconfigured severity as the alternate. A gate that a non-admin can bypass, or that the code defeats, is rated on its real exposure.
+- **Rate Deployment-origin exposure at the documented baseline** in the headline, and give the misconfigured severity as the alternate (SKILL.md Rule 11). When the code offers no safe way to deploy, the exposure stays in the headline.
 
-Overall risk equals the highest finding severity, unless you justify otherwise in one sentence.
+Overall risk equals the highest finding severity at the documented-deployment baseline, unless you justify otherwise in one sentence. When it depends on deployment, give it both ways.
 
-Severities drive the Monocle Score (SKILL.md, Step 5, Monocle Score): Critical −40, High −20, Medium −8, Low −3, Info 0. Info findings are observations and cost nothing. Rate each finding on its merits, never to reach a target score.
+Severities drive the Monocle Score (SKILL.md, Step 5, Monocle Score): Critical −40, High −20, Medium −8, Low −3, Info 0. The highest severity also sets the score's range (Critical 0–39, High 25–69, Medium 50–89, otherwise 70–100). Info findings are observations and cost nothing. Rate each finding on its merits, never to reach a target score.
 
 ---
 

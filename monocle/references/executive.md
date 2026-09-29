@@ -39,14 +39,15 @@ Rules:
 - **Quantify when possible.** "All managed Macs", "about 30 seconds per device", "requires a restart", "one person maintains it".
 - **Neutral, confident tone.** Don't be alarmist, and don't hedge the point away. Use "could" only for real uncertainty.
 - **One recommendation.** Always include one. Never write "it depends" without saying on what.
-- **Monocle Score line.** Copy the score and band from the report header (SKILL.md, Step 5, Monocle Score). Leave the breakdown out of this view; it has its own section. Write any condition in plain language. The score line doesn't count toward the 3–6 bullets.
+- **Monocle Score line.** Copy the score and band from the report header (SKILL.md, Step 5, Monocle Score). The first number assumes the tool is deployed as documented. Write the condition for the alternate as the administrator action it depends on, in plain language, for example "or 25/100 (Poor) if any Self Service policy offers every action". Leave the breakdown out of this view; it has its own section. The score line doesn't count toward the 3–6 bullets.
+- **Powerful features are not defects.** When the tool can do something drastic on purpose, and administrators control whether users see it, say who controls it. Don't present it as a flaw. Write "Administrators choose which actions each policy offers; unless they do, users see all 20, including removing the security agent", not "The tool lets any user remove the security agent". Save risk language for what the code itself gets wrong (SKILL.md Rule 14).
 
 Recommendation levels:
 
 | Level | Use when |
 |---|---|
 | **Approve** | No Critical/High security findings; failure is low-impact and reversible |
-| **Approve with conditions** | Safe to run once specific, named fixes or controls are in place (for example, "after the stored password is removed", or "pilot on 5% of devices first") |
+| **Approve with conditions** | Safe to run once specific, named fixes or controls are in place (for example, "after the stored password is removed", "pilot on 5% of devices first", or administrator configuration from the Operator baseline such as "once every Self Service policy limits the menu") |
 | **Hold** | Material risk or unknowns that need an owner decision or more information before running |
 | **Do not run** | A Critical security finding, likely data loss, or behavior that can't be verified (obfuscated or remote code) |
 

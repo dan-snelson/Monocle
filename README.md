@@ -82,6 +82,14 @@ Each report starts at 100 and loses points for every distinct issue:
 | Info Security finding | 0 |
 | Non-security issue (Manager fragility, Engineer footgun or edge case) | 2 each, 20 at most |
 
-Any Critical finding caps the score at 39, any High at 69, and any Medium at 89. Bands: 90–100 Excellent, 70–89 Good, 50–69 Fair, 25–49 Poor, 0–24 Critical. When a severity depends on deployment, the score is given both ways. The full rules are in `monocle/SKILL.md`, Step 5.
+The most severe finding sets the range the score must land in, in both directions: Critical 0–39, High 25–69, Medium 50–89, otherwise 70–100. A raw score outside that range is capped or floored to it. One serious finding can't hide in an otherwise clean report, and a pile of small issues can't push a report into a band its worst finding doesn't justify. Bands: 90–100 Excellent, 70–89 Good, 50–69 Fair, 25–49 Poor, 0–24 Critical.
+
+The score rates the code, not the Mac Admin. Mac Admin tools are meant to be powerful, and deploying them carefully is the admin's job:
+
+- **Capabilities aren't defects.** A documented operation behind an admin-controlled gate (a Jamf parameter, policy scope, a confirmation dialog) isn't scored, even if it removes an EDR agent or deletes data. It counts only when the gate can be bypassed, fails open, or is defeated by the code. A blank-parameter default that offers everything counts as one Low finding.
+- **Documented-deployment headline.** When a severity depends on deployment, the headline assumes the tool is deployed as documented. The misconfigured score is given as the alternate, and the report lists each assumption as an **Operator baseline** checklist. If the code offers no safe way to deploy, the exposure counts in the headline.
+- **Maintainer-only tooling isn't scored.** Examples are release helpers and sync scripts. Its issues are still reported.
+
+The full rules are in `monocle/SKILL.md`, Step 5 and Rule 14.
 
 Fetching from GitHub works best with an authenticated [`gh`](https://cli.github.com) CLI, which also covers private repos. In Codex, fetching from GitHub needs network access in the sandbox; if network access is off, clone the repo locally and point Monocle at the path.

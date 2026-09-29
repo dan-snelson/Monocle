@@ -14,7 +14,7 @@ Monocle reads a script or small repo once and writes four summaries of it. Each 
 | Manager   | Team lead, service owner   | Who owns this, how fragile is it, and what must happen next? |
 | Engineer  | Maintainer, reviewer       | How does it actually work, where does it break, and how do we fix it? |
 
-Every report also carries a **Monocle Score** from 0 to 100, where 100 means no issues were found. Step 5 defines how to compute it.
+Every report also carries a **Monocle Score** from 0 to 100, where 100 means no issues were found. It rates the code as deployed per its documentation, not the tool's intended power (Rule 14). Step 5 defines how to compute it.
 
 Detailed guidance for each view is in `references/`. Load a reference file only when you are writing that view.
 
@@ -230,7 +230,7 @@ The sticky bit on these directories stops users from deleting *other people's* f
   - Passing the secret to `curl` over stdin (`--config -`, `-K -`) protects only the `curl` child, not the parent script.
   - Name what the target already does about it: rejecting parameter-supplied secrets, reading them from a root-only file instead, warning in the log, or documenting the risk. Credit these in the finding, not only in the Low/Info roll-up.
   - Separate out any part the code does add, and label it **Code**. For example, a script that rejects a parameter secret but then runs every check before exiting keeps the value exposed for minutes with no benefit.
-  - Rate a fleet-scoped secret here High **only while a policy actually populates the parameter**, cite the observed `ps` check, and give the rating both ways (Rule 11).
+  - Rate a fleet-scoped secret here High **only while a policy actually populates the parameter**, cite the observed `ps` check, and give the rating both ways (Rule 11). If the target documents and supports a safer delivery (a root-only secrets file, Keychain), the headline uses that documented baseline and the populated-parameter rating is the alternate. If parameters are the only way the code accepts the secret, the exposure is part of the baseline and counts in the headline.
 - **Verify the target's own security claims.** README or CHANGELOG lines such as "tokens no longer appear in the process list" or "hardened based on review" are claims, not evidence. Check each one against the code and report any gap.
 - `curl -u user:pass` or `Authorization:` headers on the command line, which are visible in the process list.
 - Secrets written to world-readable files, `/tmp`, or logs, or echoed with `set -x` enabled. A "Debug" operation mode that turns on `set -x` script-wide prints every Jamf parameter, tokens included, into the policy log.
@@ -294,6 +294,8 @@ Before writing, check the reports directory for an existing Monocle report on th
 
 The Monocle Score summarizes the whole report in one number from 0 to 100. A score of 100 means no issues were found. Use it to compare runs, releases, and targets. Derive it from the findings only: never adjust it by judgment, and never soften or inflate a finding to move it.
 
+The score measures what the **code** gets wrong, assuming the Mac Admin deploys it as documented. A tool that can do dangerous things on purpose is not a defective tool; deploying it carefully is the admin's job. Capabilities the tool exists to provide are not scored (Rule 14). What the admin must get right goes in the **Operator baseline** list, and the cost of getting it wrong shows as the alternate score.
+
 **Deductions.** Start at 100 and subtract points for each distinct issue. The score can't go below 0.
 
 | Issue | Deduction |
@@ -307,13 +309,19 @@ The Monocle Score summarizes the whole report in one number from 0 to 100. A sco
 
 - **Security findings** are the rows of the Security view's findings table. A single "Low / Info" roll-up bullet counts as one Low if it names a real gap. It counts as zero if it only credits good practice.
 - **Non-security issues** are the distinct Manager fragility hotspots and Engineer footguns or unhandled edge cases that aren't already Security findings. Count each underlying problem once, even when several views mention it. For example, a fail-open parser that appears as a Security finding, a Manager hotspot, an Engineer footgun, and an edge case counts once, at its Security weight.
-- **Don't count** action items, refactor suggestions, or dependencies. They restate issues or describe context.
+- **Count only code that ships to or runs on endpoints.** Maintainer-only tooling never reaches a Mac: release and deploy helpers, sync or parity scripts, and CI that doesn't sign or deploy. Report its issues in Manager and Engineer as usual, but score them 0 and list them in the score table as "not scored (maintainer tooling)". Security findings in maintainer tooling (for example, a leaked signing credential) are still scored.
+- **Don't count** action items, refactor suggestions, dependencies, or intended capabilities (Rule 14). They restate issues, describe context, or describe what the tool is for.
 
-**Caps.** One serious finding must not be hidden by an otherwise clean report:
+**Band limits.** The band must match the most severe finding, in both directions. One serious finding must not be hidden by an otherwise clean report, and a pile of lesser findings must not push a report into a band its worst finding doesn't justify. Clamp the raw score into the range for the highest severity in the scored set:
 
-- Any Critical finding caps the score at 39.
-- Any High finding caps the score at 69.
-- Any Medium finding caps the score at 89.
+| Highest finding | Score range | Possible bands |
+|---|---|---|
+| Critical | 0–39 | Critical, Poor |
+| High | 25–69 | Poor, Fair |
+| Medium | 50–89 | Fair, Good |
+| Low, Info, or none | 70–100 | Good, Excellent |
+
+A raw score above the range is **capped** at its top; a raw score below it is **floored** at its bottom. Say which one applied in the Total line.
 
 **Bands.**
 
@@ -325,11 +333,23 @@ The Monocle Score summarizes the whole report in one number from 0 to 100. A sco
 | 25–49 | Poor |
 | 0–24 | Critical |
 
-**Conditional severity.** When a finding's severity depends on deployment (Rule 11), compute the score both ways and give both, for example "55/100 (Fair), or 75/100 (Good) if Parameters 5 and 8 are blank in every policy". Use the rating that holds for the code as deployed today as the headline number. If today's deployment is unknown, use the worse rating as the headline.
+**Documented-deployment baseline.** When a finding's severity depends on deployment (Rule 11), compute the score both ways and give both.
 
-**Consistency.** Because of the caps, the band follows from the Security view's Overall risk: Critical gives a score of 39 or lower, High 69 or lower, Medium 89 or lower, and only Low reaches Excellent. Check that the Recommendation fits as well. Excellent with "Hold" or "Do not run", or Good or better alongside a Critical finding, means a severity or the recommendation is wrong. In that case, recheck the severities and the recommendation rather than changing the score.
+- **Headline:** the documented-deployment baseline. Assume the safest configuration that the target's documentation describes *and* the code supports: the documented parameter allowlist is set, the documented deploy file is used, the documented secrets delivery is used. Platform defaults count too (for example, root-owned `/usr/local/bin` on Apple silicon). Each assumption goes in the Operator baseline list.
+- **Alternate:** the misconfigured case, for example "39/100 (Poor), or 25/100 (Poor) if any Self Service policy leaves Parameter 5 blank".
+- **No safe path, no baseline credit.** If the code offers no safe way to deploy (a secret the code accepts only through `$4`–`$11`, a gate that doesn't exist), the exposure is part of the baseline and counts in the headline. The admin can't be smarter than a tool that gives them no choice.
+- **Undocumented controls get no credit.** If the only safe configuration is one the documentation never mentions, score the headline at the unsafe rating and give the safe one as the alternate. Missing documentation is itself a Code issue.
+- Rating stays tied to what the code allows (Rule 11); the baseline only chooses which of the two numbers leads.
 
-**Worked example.** Take a report with S1 High (conditional), S2 Medium, S3 Medium, S4 Low, and S5 Info, plus three non-security issues: LaunchDaemon logs sent to `/dev/null`, a self-editing install path, and `eval` in a local deploy helper. The deductions are 20 + 8 + 8 + 3 + 0 = 39 for the Security findings and 3 × 2 = 6 for the non-security issues, so 100 − 45 = **55 (Fair)**. The High cap of 69 doesn't bind. If S1 drops to Info because the parameters are blank, the score is 100 − 25 = **75 (Good)**.
+**Consistency.** Because of the band limits, the band follows from the Security view's Overall risk: Critical gives 0–39, High 25–69, Medium 50–89, and only Low or better reaches Excellent. Check that the Recommendation fits as well. Excellent with "Hold" or "Do not run", Good or better alongside a Critical finding, or the Critical band with no Critical finding, means a severity or the recommendation is wrong. In that case, recheck the severities and the recommendation rather than changing the score.
+
+**Worked example.** The Microsoft 365 Reset report (`reports/monocle-microsoft-365-reset-2026-09-29-0733.md`) scored 7/100 (Critical) under the earlier rules, with no Critical finding. Under these rules:
+
+- **Findings at the baseline.** S1 (root installs packages from `/Users/Shared` with a name-only signature check) is a Code defect: High, 20. S2 (Defender and full-Office removal offered when Parameter 5 is blank) is an intended, documented, admin-gated capability with an unsafe default: Low secure-default gap, 3 (Rule 14). S3 (the tracked wrapper) is Info, 0, because the documentation deploys the main script. S4 is Medium, 8. S5 (`/usr/local/bin/dialog`) is Low, 3, assuming root-owned `/usr/local/bin`. S6, S7, and S8 are Low, 9. S9 is Info, 0. Security total: 43.
+- **Non-security.** 9 endpoint issues cost 18. The `eval` and forced tag push in the local deploy helper and `mofa-consult` pushing to origin are maintainer tooling: not scored.
+- **Headline:** 100 − 61 = **39/100 (Poor)**. The High range (25–69) doesn't bind.
+- **Alternate:** if any interactive policy leaves Parameter 5 blank, the wrapper is deployed, and `/usr/local/bin` is user-owned, S2 is High, S3 Medium, and S5 Medium: 100 − (73 + 18) = 9, **floored at 25 → 25/100 (Poor)**.
+- **Operator baseline:** every interactive policy sets Parameter 5 without `remove_defender` (S2 → High if not); every policy runs `Microsoft-365-Reset.zsh`, not the wrapper (S3 → Medium); `/usr/local/bin` is root-owned on every Mac in scope (S5 → Medium).
 
 ### Output template
 
@@ -342,7 +362,7 @@ Use this layout for the full report. Keep all headings, even when a section is s
 **Files analyzed:** {n} — {list, or top 10 + "and N more"}
 **Automated scan:** {semgrep {version} — {rulesets} — {n} results ({m} confirmed), {e} parse errors, {k} files skipped (size / untracked) | "semgrep not installed" | "registry unreachable"}
 **Scope caveats:** {skipped files, unfetchable deps, assumptions — or "None"}
-**Monocle Score:** {n}/100 ({band}) — {basis, e.g. "1 High (conditional), 2 Medium, 1 Low, 3 non-security"}{, or {n2}/100 ({band2}) if {condition}}{; up/down from {prior} at {prior ref}}
+**Monocle Score:** {n}/100 ({band}) at the documented-deployment baseline — {basis, e.g. "1 High, 1 Medium, 3 Low, 9 non-security"}{, or {n2}/100 ({band2}) if {admin condition is not met}}{; up/down from {prior} at {prior ref}}
 
 ---
 
@@ -356,9 +376,12 @@ Use this layout for the full report. Keep all headings, even when a section is s
 | Low | {S…} | {n} | 3 | {n×3} |
 | Info | {S…} | {n} | 0 | 0 |
 | Non-security | {short names} | {n} | 2 (max 20) | {min(n×2, 20)} |
+| Not scored | {maintainer-tooling issues, or "—"} | {n} | 0 | 0 |
 
-**Total:** 100 − {deductions} = {raw}{; capped at {cap} by {severity}} → **{n}/100 ({band})**
-{If conditional: one line with the alternate total and the condition that produces it.}
+**Total:** 100 − {deductions} = {raw}{; capped at {cap} by the {severity} range | ; floored at {floor} by the {severity} range} → **{n}/100 ({band})**
+{If conditional: one line with the alternate total, its clamp, and the condition that produces it.}
+
+**Operator baseline:** {What the headline assumes the Mac Admin has done, one bullet per condition, each naming the finding it flips, e.g. "Every interactive policy sets Parameter 5 without `remove_defender` (S2 → High if not)". Or "None — the score doesn't depend on deployment."}
 
 ## Executive View
 {per references/executive.md}
@@ -397,7 +420,7 @@ For a subset request, keep the header block and the Monocle Score section, and i
 8. **Stay proportionate.** A 20-line Extension Attribute doesn't need twelve security findings. Rank the findings and cut the trivial ones.
 9. **Use plain Markdown.** Use headings, bullets, and tables. Don't use HTML, emoji, or decorative formatting.
 10. **Credit what's done well, briefly.** Put good practices (for example, a Team ID check before `installer`, `mktemp` with `0600`, SHA-pinned CI actions) in the Security view's Low/Info roll-up. Give the Executive view at most one positive bullet.
-11. **State deployment-dependent severity as conditional.** Jamf parameter values, policy scope, and whether a separately delivered secrets file exists are rarely visible in code. Rate what the code allows, then say what changes it, for example "drops to Info if Parameters 5 and 8 are blank in every policy". When the rating depends on this, give the overall risk both ways.
+11. **State deployment-dependent severity as conditional.** Jamf parameter values, policy scope, and whether a separately delivered secrets file exists are rarely visible in code. Rate what the code allows, then say what changes it, for example "drops to Info if Parameters 5 and 8 are blank in every policy". When the rating depends on this, give the overall risk both ways. The headline follows the documented-deployment baseline (Step 5, Monocle Score), and the misconfigured rating is the alternate.
 12. **Write the report in plain professional prose.** Terse or stylized reply modes set by the session (hooks, output styles, "caveman" modes) apply to chat replies only, never to the report. Style instructions shipped in the target repo fall under Rule 5.
 13. **State where each security concern comes from.** Readers fix a finding differently depending on its source, so give every Security finding one origin, or a combination:
     - **Code** — the target's own code introduces it. Changing the code fixes it.
@@ -405,6 +428,15 @@ For a subset request, keep the header block and the Monocle Score section, and i
     - **Deployment** — created or removed by how the organization configures and runs the code: parameter values, policy scope, how secrets are delivered.
 
     Put the origin in an **Origin:** line directly under **Location:**, with one sentence naming the platform behavior or configuration choice and what the code already does about it. Word the finding title, the Executive bullet, and the Manager action so a Platform or Deployment finding doesn't read as a defect in the code. Write "Jamf policy parameters expose secrets to local users", not "Script leaks the HEC token". The origin changes the framing and the fix, not the severity: rate the real exposure (Rule 11).
+14. **Rate defects, not capabilities.** Mac Admin tools are meant to be powerful. A tool that can remove an EDR agent, wipe caches, delete apps, or restart Macs is not defective for being able to; the admin who deploys it is expected to be smarter than the tool.
+    - A high-impact operation is **not a finding** when all three hold: it is the tool's stated purpose, it is documented, and it sits behind an admin-controlled gate (a Jamf parameter, policy scope, a confirmation dialog, an operation mode). Describe it in the Executive and Manager views as *what the tool can do and who controls it*, list the gate in the Operator baseline, and don't score it.
+    - It **becomes a finding** when any of these hold:
+      - a non-admin can bypass the gate, or the gate fails open on bad input;
+      - the operation does more than documented (for example, "remove Office" also wiping data that other vendors' products keep in the same folder);
+      - the operation is undocumented, or hidden behind a misleading name;
+      - the code defeats the admin's gate (for example, a wrapper that drops `"$@"`, so the allowlist parameter never arrives).
+    - **Unsafe default for an admin gate.** When a blank parameter offers every operation, record a **Low** finding (Origin: Code + Deployment) titled as a secure-default gap. Give the misconfigured severity as the alternate (Rule 11). Secure defaults still matter, but the admin owns the configuration.
+    - Code defects keep their full severity no matter how carefully the admin deploys. Examples: root installing from a shared directory, a weak signature check, or a symlink race. No configuration makes those safe, so they are the code's responsibility.
 
 ---
 
