@@ -70,7 +70,19 @@ Examples:
 
 All four views are produced by default. To get a subset, ask for it: "just the executive and manager views".
 
-Every report is saved to one central directory as `monocle-{target}-{YYYY-MM-DD-HHMM}.md`: `$MONOCLE_REPORTS_DIR` if set, otherwise `~/monocle-reports` (the directory is created if missing). Reports contain security findings, so keep them out of version control. If you point `MONOCLE_REPORTS_DIR` inside a git repo, gitignore it; this repo's `.gitignore` already excludes `/reports/`. For example:
+Every report is saved to one central directory as `monocle-{target}-{YYYY-MM-DD-HHMM}.md` (the directory is created if missing):
+
+1. `$MONOCLE_REPORTS_DIR`, if set.
+2. This repo's `reports/` directory, when the skill runs from this checkout, including through a symlink (see below).
+3. Otherwise `~/monocle-reports`, which is what a copied install (`cp -Rv monocle …`) uses.
+
+Reports contain security findings, so keep them out of version control. This repo's `.gitignore` already excludes `/reports/`; if you point `MONOCLE_REPORTS_DIR` inside another git repo, gitignore it there. To keep reports in this repo from any project, install with a symlink instead of a copy:
+
+```zsh
+ln -s "$PWD/monocle" ~/.claude/skills/monocle
+```
+
+Or set the directory explicitly:
 
 ```bash
 export MONOCLE_REPORTS_DIR="$HOME/Documents/Monocle/reports"

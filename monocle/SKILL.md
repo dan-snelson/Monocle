@@ -289,7 +289,7 @@ Check these even when a prior report didn't flag them. Removal lists are long an
 
 ## Step 5 — Write the views
 
-Before writing, check the reports directory for an existing Monocle report on the same target:
+Before writing, check the reports directory (resolved as in item 9 below; also check `$HOME/monocle-reports` when it differs, since earlier versions saved there) for an existing Monocle report on the same target:
 
 - If a prior report has the same target and ref/SHA, treat it as a checklist and draft aid only. Do not treat it as current evidence until you have re-run the input classification, git status, ignored/local-file check, automated scan or its documented failure path, and citation verification against the current checkout.
 - If the target ref/SHA or working tree status differs, treat the prior report as historical context only. Rebuild the fact sheet from the current target.
@@ -318,14 +318,27 @@ Before writing, check the reports directory for an existing Monocle report on th
    - It records when the analysis ran, not when the code was committed; the SHA or ref covers that.
    - Never guess it from commit history or training data.
 9. **Write the report to the reports directory.**
-   - Always save the full report, whatever its length, to one central reports directory: `$MONOCLE_REPORTS_DIR` if set, otherwise `$HOME/monocle-reports`. Use this directory regardless of the current working directory or the target's location, and never write reports into the target repo. Create it if it doesn't exist:
+   - Always save the full report, whatever its length, to one central reports directory. Resolve it in this order, regardless of the current working directory or the target's location:
+     1. `$MONOCLE_REPORTS_DIR`, if set.
+     2. The Monocle repo's `reports/` directory, when this skill runs from a Monocle checkout: the directory containing this `SKILL.md` (Claude Code shows it as the skill's base directory; Codex lists the `SKILL.md` path), with symlinks resolved, is `monocle/` at the root of a git repo.
+     3. Otherwise `$HOME/monocle-reports`. This covers copied installs such as `~/.claude/skills/monocle` or a project's `.claude/skills/monocle`, so reports never land in whatever project happens to contain the copy.
 
      ```bash
-     reports="${MONOCLE_REPORTS_DIR:-$HOME/monocle-reports}"
+     skill_dir='…'   # directory containing this SKILL.md
+     skill_dir=$(cd "$skill_dir" && pwd -P)
+     repo_root=$(git -C "$skill_dir/.." rev-parse --show-toplevel 2>/dev/null)
+     if [[ -n "$MONOCLE_REPORTS_DIR" ]]; then
+       reports="$MONOCLE_REPORTS_DIR"
+     elif [[ -n "$repo_root" && "$skill_dir" == "$(cd "$repo_root" && pwd -P)/monocle" ]]; then
+       reports="$repo_root/reports"
+     else
+       reports="$HOME/monocle-reports"
+     fi
      mkdir -p "$reports"
      ```
 
-   - Reports contain security findings. If `$reports` is inside a git repository, make sure the path is gitignored before writing, and warn the user if it isn't.
+   - Never write reports into the target repo. The one exception is Monocle reviewing its own checkout, where option 2 applies.
+   - Reports contain security findings. If `$reports` is inside a git repository, make sure the path is gitignored before writing (`git -C "$reports" check-ignore -q "$reports/probe.md"`), and warn the user if it isn't. The Monocle repo's `.gitignore` already excludes `/reports/`.
 
    - Name the file `monocle-{target}-{YYYY-MM-DD-HHMM}.md`, using the same timestamp as the header (`date '+%Y-%m-%d-%H%M'`). `{target}` is the repo or file basename, lowercased, with anything outside `[a-z0-9._-]` replaced by `-`. Including the time keeps same-day re-runs from overwriting each other; if the name still exists, append `-2`, `-3`, and so on. Never overwrite an existing report.
    - Keep working files (clones, fetched sources, `semgrep.json`, `semgrep.err`) in the scratch directory. `$reports` holds finished reports only.
