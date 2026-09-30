@@ -49,7 +49,7 @@ Rules:
 - **Assign an owner role to every action item** ("Mac engineer", "Security", "Jamf admin", "Service owner"), not a person's name, unless the code names an owner.
 - **Effort:** S is under 2 hours, M is under 2 days, L is more than that.
 - **Priority:** P1 means before the next run or deployment. P2 means this quarter. P3 means backlog.
-- **List 3–8 action items.** Include every Critical and High item from the Security view as a P1 action.
+- **List up to 8 action items.** Include every Critical and High item from the Security view as a P1 action. Don't invent work for a clean script; if nothing needs doing, write "No action required." in place of the table (SKILL.md Rule 7).
 
 ---
 

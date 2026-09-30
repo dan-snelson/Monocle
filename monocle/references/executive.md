@@ -33,13 +33,13 @@ Use exactly this structure:
 
 Rules:
 
-- **3–6 bullets.** No more, no fewer.
+- **1–6 bullets.** Use as many as the real risks and facts need, and no more. Don't pad a low-risk view to reach a count (SKILL.md Rule 7).
 - **Plain language.** Don't use jargon, command names, file paths, or line numbers. Write "administrator-level access to every Mac", not "runs as root via Jamf policy". Mention product names (Jamf, Okta, Slack) only when the reader would recognize them.
 - **Lead with impact.** Each bullet states a consequence first and the cause second, if at all.
 - **Quantify when possible.** "All managed Macs", "about 30 seconds per device", "requires a restart", "one person maintains it".
 - **Neutral, confident tone.** Don't be alarmist, and don't hedge the point away. Use "could" only for real uncertainty.
 - **One recommendation.** Always include one. Never write "it depends" without saying on what.
-- **Monocle Score line.** Copy the score and band from the report header (SKILL.md, Step 5, Monocle Score). The first number assumes the tool is deployed as documented. Write the condition for the alternate as the administrator action it depends on, in plain language, for example "or 25/100 (Poor) if any Self Service policy offers every action". Leave the breakdown out of this view; it has its own section. The score line doesn't count toward the 3–6 bullets.
+- **Monocle Score line.** Copy the score and band from the report header (SKILL.md, Step 5, Monocle Score). The first number assumes the tool is deployed as documented. Write the condition for the alternate as the administrator action it depends on, in plain language, for example "or 25/100 (Poor) if any Self Service policy offers every action". Leave the breakdown out of this view; it has its own section. The score line doesn't count toward the 1–6 bullets.
 - **Powerful features are not defects.** When the tool can do something drastic on purpose, and administrators control whether users see it, say who controls it. Don't present it as a flaw. Write "Administrators choose which actions each policy offers; unless they do, users see all 20, including removing the security agent", not "The tool lets any user remove the security agent". Save risk language for what the code itself gets wrong (SKILL.md Rule 14).
 
 Recommendation levels:
@@ -47,7 +47,7 @@ Recommendation levels:
 | Level | Use when |
 |---|---|
 | **Approve** | No Critical/High security findings; failure is low-impact and reversible |
-| **Approve with conditions** | Safe to run once specific, named fixes or controls are in place (for example, "after the stored password is removed", "pilot on 5% of devices first", or administrator configuration from the Operator baseline such as "once every Self Service policy limits the menu") |
+| **Approve with conditions** | Safe to run once specific, named fixes or controls are in place (for example, "after failures are reported correctly", "pilot on 5% of devices first", or administrator configuration from the Operator baseline such as "once every Self Service policy limits the menu") |
 | **Hold** | Material risk or unknowns that need an owner decision or more information before running |
 | **Do not run** | A Critical security finding, likely data loss, or behavior that can't be verified (obfuscated or remote code) |
 
@@ -104,14 +104,14 @@ Why it's weak: it describes mechanism instead of purpose, uses jargon, makes vag
 **In one sentence:** Sets up new Macs automatically at first login: it installs standard apps, applies security settings, and shows the user progress on screen.
 
 - **Runs with full administrator access on every new Mac.** A mistake affects every device enrolled while it's active.
-- **Contains a stored password for our device-management system.** Anyone who can view the policy can copy it and use it to change settings across the fleet.
+- **Contains a password for our device-management system written into the script itself.** Anyone who can read the script can copy it and use it to change settings across the fleet.
 - **Failures are hidden.** If an app fails to install, the Mac still reports "success", so gaps show up later as help desk tickets.
 - **Needs internet and one download site to be available.** If that site is down, setup stalls for new hires on day one.
 - **Maintained by one person.** No documentation or tests exist outside their knowledge.
 
 **Monocle Score:** 32/100 (Poor)
 
-**Recommendation:** Approve with conditions — remove the stored password and fix the false "success" reporting before using it for the next hiring wave.
+**Recommendation:** Do not run — the password in the script gives anyone who can read it control of the whole fleet; remove it and fix the false "success" reporting before the next hiring wave.
 ```
 
 ### Good (low-risk case)

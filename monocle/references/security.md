@@ -87,15 +87,15 @@ Assign exactly one severity to each finding. Base it on **impact × reachability
 
 | Severity | Criteria | Typical examples |
 |---|---|---|
-| **Critical** | Remote or unauthenticated code execution as root, **or** a plaintext credential that grants write/admin access to a fleet-wide system, **or** deliberate disabling of a core security control on many devices | `curl http://… \| sudo bash`; Jamf API admin creds hardcoded; `spctl --master-disable` fleet-wide |
+| **Critical** | Remote or unauthenticated code execution as root, **or** a plaintext credential that grants write/admin access to a fleet-wide system and is hardcoded in the code, repo, or shipped payload (see **Credential severity**), **or** deliberate disabling of a core security control on many devices | `curl http://… \| sudo bash`; Jamf API admin creds hardcoded; `spctl --master-disable` fleet-wide |
 | **High** | Local privilege escalation to root; code injection from an attacker-influenced input; a secret with meaningful scope exposed in logs, the process list, or a world-readable file; TLS verification disabled on a download that gets executed; unverifiable (obfuscated) behavior | `eval "$4"`; root reads and executes `~/Library/…/script.sh`; `curl -k` then run; `curl -u admin:pass` visible in `ps` |
-| **Medium** | Exploitable only with local access plus timing, or the impact is limited to one user or device; weak integrity checks; overly broad permissions | Predictable `/tmp/foo` written as root; `chmod 777`; downloaded pkg installed without a signature/Team ID check; secret in a Jamf param (UI-visible to admins) |
+| **Medium** | Exploitable only with local access plus timing, or the impact is limited to one user or device; weak integrity checks; overly broad permissions | Predictable `/tmp/foo` written as root; `chmod 777`; downloaded pkg installed without a signature/Team ID check; narrow or read-only credential in a Jamf param (see **Credential severity**) |
 | **Low** | Defense-in-depth gaps with no clear exploit path | Missing `umask`; verbose logging of non-secret identifiers; no `--proto '=https'` on an HTTPS URL |
 | **Info** | Observations useful for context, not risk | Uses `launchctl asuser` correctly; TLS pinned; runs read-only |
 
 Adjust severity for context:
 
-- **Raise** it one level when the code runs fleet-wide by default (a Jamf policy scoped to All Computers, or a pkg in the enrollment prestage).
+- **Raise** it one level when the code runs fleet-wide by default (a Jamf policy scoped to All Computers, or a pkg in the enrollment prestage). This doesn't apply to credential findings (see **Credential severity**).
 - **Lower** it one level when the vulnerable path requires admin access that already implies equivalent power. Say so explicitly.
 - Rate **silent failures in security controls** at least Medium. Examples: a FileVault enforcement script that exits 0 on error, or a firewall-enable step whose failure is swallowed.
 - **Don't rate intended capabilities.** A documented, admin-gated destructive operation (EDR removal, data deletion, app removal) is not a finding (SKILL.md Rule 14). A blank-parameter default that offers everything is a Low secure-default gap, with the misconfigured severity as the alternate. A gate that a non-admin can bypass, or that the code defeats, is rated on its real exposure.
@@ -104,6 +104,20 @@ Adjust severity for context:
 Overall risk equals the highest finding severity at the documented-deployment baseline, unless you justify otherwise in one sentence. When it depends on deployment, give it both ways.
 
 Severities drive the Monocle Score (SKILL.md, Step 5, Monocle Score): Critical −40, High −20, Medium −8, Low −3, Info 0. The highest severity also sets the score's range (Critical 0–39, High 25–69, Medium 50–89, otherwise 70–100). Info findings are observations and cost nothing. Rate each finding on its merits, never to reach a target score.
+
+### Credential severity
+
+Rate every credential finding with this table. Other sections of this file and of SKILL.md defer to it.
+
+| Where the credential lives | Fleet-wide write/admin scope | Narrow or read-only scope |
+|---|---|---|
+| Hardcoded in the code, repo, or shipped payload (includes base64) | **Critical** (Origin: Code) | **High** (Origin: Code) |
+| Jamf parameter `$4`–`$11`, while a policy populates it | **High** (Origin: Platform + Deployment): readable in `argv` by every local user for the whole run, and in the Jamf policy UI | **Medium** (Origin: Platform + Deployment) |
+| Written to a log, a world-readable file, or `set -x` output | **High** (Origin: Code) | **Medium** (Origin: Code) |
+| Read from a root-only file or the Keychain, never logged | Info (good practice) | Info |
+
+- The "raise one level for fleet-wide" adjustment above doesn't apply here; scope is already a column.
+- When the code documents and supports a safer delivery than parameters, apply SKILL.md Rule 11: the headline uses that baseline and the populated-parameter rating is the alternate. When parameters are the only way the code accepts the secret, the parameter rating is the headline.
 
 ---
 
@@ -123,6 +137,7 @@ Why it's weak: no location, no evidence, no specific impact, and a generic fix.
 ```markdown
 #### S1 — Remote script executed as root without integrity check · Critical
 - **Location:** `install.zsh:57`
+- **Origin:** Code — the script pipes a mutable remote branch into a root shell; nothing in the platform or deployment requires it, and the code does no integrity check.
 - **Evidence:** `curl -sL "https://raw.githubusercontent.com/example/tools/main/setup.sh" | /bin/bash`
 - **Impact:** Runs as root via Jamf policy on all enrolled Macs. Anyone who can push to `example/tools` main, or who can tamper with DNS/TLS on the client network, gets root code execution fleet-wide. The `main` branch is mutable, so content can change between runs.
 - **Fix:** Vendor `setup.sh` into this repo, or pin to a commit SHA and verify it before running: download to `mktemp`, check with `shasum -a 256 -c`, then execute. Add `--fail --proto '=https' --tlsv1.2`.
@@ -175,7 +190,7 @@ Why it's weak: no location, no evidence, no specific impact, and a generic fix.
 
 ### Jamf / macOS
 
-- **Params `$4`–`$11`** are visible to anyone with policy read access in Jamf Pro. Credentials there are at least Medium; they are High if the account is admin-scoped and also logged.
+- **Params `$4`–`$11`** are visible to anyone with policy read access in Jamf Pro, and to every local user through the script's `argv` (SKILL.md Step 4, Secrets). Rate credentials there with **Credential severity** above.
 - **Bearer-token handling:** check that tokens are invalidated (`/api/v1/auth/invalidate-token`) and not written to disk.
 - **Extension Attributes** run as root on every recon. Keep them read-only; any write is a finding.
 - **`jamf` binary calls** (`jamf policy -event`, `jamf recon`, `jamf manage`) can chain into other root code. Note the dependency.

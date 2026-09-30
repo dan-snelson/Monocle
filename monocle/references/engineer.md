@@ -56,7 +56,7 @@ Rules:
 - **Tone:** direct and technical. Write like a senior engineer in a code review.
 - **Control flow:** use 5–15 numbered steps. Cover branches, loops, early exits, and traps. Mention every function only if the file is small; otherwise cover the main path and the risky branches.
 - **Footguns:** these are bugs or traps that already exist in the code, not stylistic preferences. Each one needs a trigger condition.
-- **Refactors:** give 3–6 suggestions. Keep before/after snippets minimal: the changed lines plus 1–2 lines of context. Make sure they're syntactically valid for the dialect.
+- **Refactors:** give up to 6 suggestions, each with a concrete benefit tied to a footgun, finding, or edge case. If none are justified, write "No refactors warranted." (SKILL.md Rule 7). Keep before/after snippets minimal: the changed lines plus 1–2 lines of context. Make sure they're syntactically valid for the dialect.
 - **Use line references wherever you can.** If lines aren't reliable (for example, pasted snippets), use `function_name()` or a short quoted snippet.
 - **Don't restate the Security view's findings in full.** Reference them ("see S2") and focus on the code-level fix.
 

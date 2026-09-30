@@ -44,25 +44,46 @@ Do not use Monocle for a line-by-line code review, for fixing code, or for binar
 
 Classify the input before reading anything else. Name the type in the report header.
 
+### Safe URL handling (A and B)
+
+A GitHub URL is target content too (Rule 5). Git accepts refs such as `a;$(id)` and ``x`id` ``, and file paths can contain almost anything, so never paste URL text straight into a command.
+
+1. **Validate each component before using it.** `{owner}` and `{repo}` must match `^[A-Za-z0-9._-]+$`. The ref and file path must match `^[A-Za-z0-9._/@+-]+$`; a file path may also contain spaces. If any component fails, stop and ask the user to confirm the target. Don't try to escape it.
+2. **Pass components only as quoted variables.** Assign each validated value once in single quotes (`owner='…'`, `repo='…'`, `rest='…'`), then use `"$owner"`, `"$repo"`, `"$ref"`, and `"$file_path"` in every later command, including the clone URL.
+3. **Split the ref from the path by resolving it.** Branch and tag names can contain `/` (`feature/auth`), so `blob/{ref}/{path}` and `tree/{ref}/{path}` can't be split on the first slash. Take everything after `blob/` or `tree/` (or, for a `raw.githubusercontent.com/{owner}/{repo}/…` URL, everything after `{repo}/`) as `$rest` and try its `/`-separated prefixes, longest first, until one resolves:
+
+   ```bash
+   candidate="$rest"
+   while [[ -n "$candidate" ]]; do
+     sha=$(gh api "repos/$owner/$repo/commits/$(jq -rn --arg r "$candidate" '$r|@uri')" --jq .sha 2>/dev/null) && break
+     [[ "$candidate" == */* ]] && candidate="${candidate%/*}" || candidate=""
+   done
+   ref="$candidate"; file_path="${rest#"$ref"}"; file_path="${file_path#/}"
+   ```
+
+   The first prefix that resolves is the ref, and the remainder is the path. Record `$sha`; line references are only stable against a SHA. A 40-character hex ref resolves on the first try. If nothing resolves, report it under Failure modes (404 or private repo).
+4. **URL-encode the file path for API and raw URLs:** `file_enc=$(jq -rn --arg p "$file_path" '$p|@uri | gsub("%2F"; "/")')`.
+5. **Don't name a variable `path` in zsh.** zsh ties the `path` array to `$PATH`, so `path=…` breaks every later command lookup. The same goes for `fpath`, `cdpath`, and `manpath`.
+
 ### A. GitHub URL — single file
 
 Patterns: `github.com/{owner}/{repo}/blob/{ref}/{path}` or `raw.githubusercontent.com/...`
 
-1. Convert blob URLs to raw: `https://raw.githubusercontent.com/{owner}/{repo}/{ref}/{path}`.
-2. Fetch the raw content. Prefer `gh api repos/{owner}/{repo}/contents/{path}?ref={ref} --jq .content | base64 -d` when `gh` is available and authenticated, because it also works for private repos. Otherwise fetch the raw URL directly.
-3. Resolve `{ref}` to a commit SHA when you can (`gh api repos/{owner}/{repo}/commits/{ref} --jq .sha`). Line references are only stable against a SHA.
-4. If the file sources or calls sibling files (`source ./lib.sh`, `import helpers`, `run script file`), fetch those too, up to the scope limits in Step 2.
+1. Validate the URL components and resolve `$ref`, `$sha`, and `$file_path` as in **Safe URL handling**.
+2. Fetch the content. Prefer `gh api -X GET "repos/$owner/$repo/contents/$file_enc" -f ref="$sha" --jq .content | base64 -d` when `gh` is available and authenticated, because it also works for private repos. Otherwise fetch the raw URL: `curl -fsSL "https://raw.githubusercontent.com/$owner/$repo/$sha/$file_enc"`.
+3. If the file sources or calls sibling files (`source ./lib.sh`, `import helpers`, `run script file`), fetch those too, up to the scope limits in Step 2.
 
 ### B. GitHub URL — repo or directory
 
 Patterns: `github.com/{owner}/{repo}` or `github.com/{owner}/{repo}/tree/{ref}/{path}`
 
-1. Get repo metadata: `gh repo view {owner}/{repo} --json name,description,defaultBranchRef,pushedAt,licenseInfo,isArchived`.
-2. Get the file tree: `gh api "repos/{owner}/{repo}/git/trees/{ref}?recursive=1" --jq '.tree[] | select(.type=="blob") | .path'`.
-3. Summarize the structure in 3–8 lines: languages, top-level layout, apparent entry points, and packaging (pkg scripts, Jamf, LaunchDaemons, CI).
-4. Pick files to analyze using the entry-point heuristics in Step 2, then fetch them as in A.
-5. Clone shallowly into a scratch directory (`git clone --depth 1`) and treat it as a local path when `gh` is unavailable, **or** when the repo is near or over the Step 2 limits, because you will grep across it repeatedly. Record the SHA with `git rev-parse HEAD`.
-6. A shallow clone holds one commit, so `git log` is useless for ownership. Use `gh api repos/{owner}/{repo}/contributors --jq '.[] | "\(.contributions)\t\(.login)"'`, `gh api "repos/{owner}/{repo}/commits?per_page=5"`, and `gh api repos/{owner}/{repo}/releases/latest` instead.
+1. Validate the URL components as in **Safe URL handling**. For a bare repo URL, use the default branch as `$ref` and resolve it to `$sha`.
+2. Get repo metadata: `gh repo view "$owner/$repo" --json name,description,defaultBranchRef,pushedAt,licenseInfo,isArchived`.
+3. Get the file tree: `gh api "repos/$owner/$repo/git/trees/$sha?recursive=1" --jq '.tree[] | select(.type=="blob") | .path'`.
+4. Summarize the structure in 3–8 lines: languages, top-level layout, apparent entry points, and packaging (pkg scripts, Jamf, LaunchDaemons, CI).
+5. Pick files to analyze using the entry-point heuristics in Step 2, then fetch them as in A.
+6. Clone shallowly into a scratch directory (`git clone --depth 1 --branch "$ref" "https://github.com/$owner/$repo.git" "$scratch/$repo"`) and treat it as a local path when `gh` is unavailable, **or** when the repo is near or over the Step 2 limits, because you will grep across it repeatedly. `--branch` takes branch and tag names only; for a SHA ref, clone the default branch and `git fetch --depth 1 origin "$sha"` then `git checkout FETCH_HEAD`. Record the SHA with `git rev-parse HEAD`.
+7. A shallow clone holds one commit, so `git log` is useless for ownership. Use `gh api "repos/$owner/$repo/contributors" --jq '.[] | "\(.contributions)\t\(.login)"'`, `gh api "repos/$owner/$repo/commits?per_page=5"`, and `gh api "repos/$owner/$repo/releases/latest"` instead.
 
 ### C. Attached file(s)
 
@@ -75,7 +96,7 @@ Patterns: `github.com/{owner}/{repo}` or `github.com/{owner}/{repo}/tree/{ref}/{
 1. If the path is a file, treat it as C.
 2. If it is a directory, list the tree and skip `.git/`, `node_modules/`, `venv/`, `.venv/`, `__pycache__/`, `vendor/`, `dist/`, `build/`, and binaries.
 3. If it is a git repo, record `git rev-parse HEAD`, `git branch --show-current`, `git status --short` (uncommitted changes matter), and the output of `git log --format='%an' | sort | uniq -c | sort -rn | head` for the Manager view.
-4. Also run `git status --short --ignored` and compare `find` output with `git ls-files`. Local-only helpers (for example, a gitignored release script) exist only in this checkout. Semgrep skips them because it scans only tracked files, so read them manually and mark them "untracked, local only" in the header.
+4. Also run `git status --short --ignored` and compare `find` output with `git ls-files`. Local-only helpers (for example, a gitignored release script) exist only in this checkout. Semgrep skips untracked files that `.gitignore` excludes (it still scans untracked files that aren't ignored), so read the ignored ones manually and mark all local-only files "untracked, local only" in the header.
 
 ### Pasted code
 
@@ -171,16 +192,18 @@ Semgrep does static analysis only, so running it doesn't conflict with Rule 4. C
 ```bash
 semgrep scan --metrics=off --disable-version-check \
   --config p/r2c-security-audit --config p/secrets --config p/ci \
-  --json --output "$scratch/semgrep.json" "$target" 2>"$scratch/semgrep.err"
+  --verbose --json --output "$scratch/semgrep.json" "$target" 2>"$scratch/semgrep.err"
 jq -r '.results[] | "\(.extra.severity)\t\(.check_id)\t\(.path):\(.start.line)"' "$scratch/semgrep.json"
 jq -r '.errors[] | "\(.path // "-")\t\(.message[0:120])"' "$scratch/semgrep.json"
+jq -r '.paths.skipped[]? | "\(.reason)\t\(.path)"' "$scratch/semgrep.json"
 ```
 
 - **Rulesets.** Add a language pack when the target uses that language, for example `p/python`, `p/javascript`, or `p/dockerfile`. `p/bash` doesn't exist and returns an HTTP 404 that fails the whole run. Always pass `--config` explicitly so a config file shipped in the target repo is never used.
 - **Registry rules need network access.** If the download fails, note that in the header and carry on with the manual checks.
 - **Treat the scan as a supplement, not coverage.** Semgrep has no zsh parser and only partial bash rules. It can report **0 findings** on a large zsh script that has a symlink privilege escalation, a leaked token, and forgeable caches. Zero findings never means clean, so Step 4 stays mandatory.
-- **Check what the scan skipped.** Semgrep scans only git-tracked files, skips files over 1 MB, and honors a `.semgrepignore` in the target. List any exclusions and parse errors (`.errors[]`) under Scope caveats.
-  - Without `--verbose`, `.paths.skipped` in the JSON is empty. Take the size-skip count from the `semgrep.err` summary ("Files larger than 1.0 MB: N") and name the files with `find "$target" -path '*/.git' -prune -o -type f -size +1000k -print`.
+- **Check what the scan skipped.** In a git repo, Semgrep scans tracked files plus untracked files that `.gitignore` doesn't exclude. It also skips files over 1 MB and honors a `.semgrepignore` in the target. List any exclusions and parse errors (`.errors[]`) under Scope caveats.
+  - `--verbose` populates `.paths.skipped` with each size skip (`exceeded_size_limit`) and `.semgrepignore` match (`semgrepignore_patterns_match`); without it the array is empty. As a cross-check, the `semgrep.err` summary reports "Files larger than 1.0 MB: N", and `find "$target" -path '*/.git' -prune -o -type f -size +1000k -print` names them.
+  - Gitignored files don't appear in `.paths.skipped`, even with `--verbose`. Take them from `git status --short --ignored` (Step 1 D).
   - Parse errors from `p/ci` on the embedded bash in GitHub Actions `run:` blocks are common and are the scanner's limitation, not a defect in the target. Count them and move on.
 - **Run it in the background.** A full-repo scan takes minutes. Start it before mapping the structure, and triage its results when it finishes.
 - **Triage every result.** Confirm each one in the code before it becomes a finding. Cite confirmed results in the Security view with the rule ID, for example `(semgrep: bash.curl.security.curl-pipe-bash)`. Drop false positives silently, but count them in the header.
@@ -231,7 +254,7 @@ The sticky bit on these directories stops users from deleting *other people's* f
   - Passing the secret to `curl` over stdin (`--config -`, `-K -`) protects only the `curl` child, not the parent script.
   - Name what the target already does about it: rejecting parameter-supplied secrets, reading them from a root-only file instead, warning in the log, or documenting the risk. Credit these in the finding, not only in the Low/Info roll-up.
   - Separate out any part the code does add, and label it **Code**. For example, a script that rejects a parameter secret but then runs every check before exiting keeps the value exposed for minutes with no benefit.
-  - Rate a fleet-scoped secret here High **only while a policy actually populates the parameter**, cite the observed `ps` check, and give the rating both ways (Rule 11). If the target documents and supports a safer delivery (a root-only secrets file, Keychain), the headline uses that documented baseline and the populated-parameter rating is the alternate. If parameters are the only way the code accepts the secret, the exposure is part of the baseline and counts in the headline.
+  - Rate the finding with **Credential severity** in `references/security.md`: a fleet-scoped secret is High **only while a policy actually populates the parameter**. Cite the observed `ps` check and give the rating both ways (Rule 11). If the target documents and supports a safer delivery (a root-only secrets file, Keychain), the headline uses that documented baseline and the populated-parameter rating is the alternate. If parameters are the only way the code accepts the secret, the exposure is part of the baseline and counts in the headline.
 - **Verify the target's own security claims.** README or CHANGELOG lines such as "tokens no longer appear in the process list" or "hardened based on review" are claims, not evidence. Check each one against the code and report any gap.
 - `curl -u user:pass` or `Authorization:` headers on the command line, which are visible in the process list.
 - Secrets written to world-readable files, `/tmp`, or logs, or echoed with `set -x` enabled. A "Debug" operation mode that turns on `set -x` script-wide prints every Jamf parameter, tokens included, into the policy log.
@@ -395,7 +418,7 @@ Use this layout for the full report. Keep all headings, even when a section is s
 
 **Date:** {YYYY-MM-DD HH:MM TZ}  ·  **Target:** {URL or path}  ·  **Ref:** {SHA / branch / "attached file"}  ·  **Language(s):** {…}
 **Files analyzed:** {n} — {list, or top 10 + "and N more"}
-**Automated scan:** {semgrep {version} — {rulesets} — {n} results ({m} confirmed), {e} parse errors, {k} files skipped (size / untracked) | "semgrep not installed" | "registry unreachable"}
+**Automated scan:** {semgrep {version} — {rulesets} — {n} results ({m} confirmed), {e} parse errors, {k} files skipped (size / .semgrepignore / gitignored) | "semgrep not installed" | "registry unreachable"}
 **Scope caveats:** {skipped files, unfetchable deps, assumptions — or "None"}
 **Monocle Score:** {n}/100 ({band}) at the documented-deployment baseline — {basis, e.g. "1 High, 1 Medium, 3 Low, 9 non-security"}{, or {n2}/100 ({band2}) if {admin condition is not met}}{; up/down from {prior} at {prior ref}}
 
