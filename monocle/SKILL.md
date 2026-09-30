@@ -178,7 +178,7 @@ jq -r '.errors[] | "\(.path // "-")\t\(.message[0:120])"' "$scratch/semgrep.json
 
 - **Rulesets.** Add a language pack when the target uses that language, for example `p/python`, `p/javascript`, or `p/dockerfile`. `p/bash` doesn't exist and returns an HTTP 404 that fails the whole run. Always pass `--config` explicitly so a config file shipped in the target repo is never used.
 - **Registry rules need network access.** If the download fails, note that in the header and carry on with the manual checks.
-- **Treat the scan as a supplement, not coverage.** Semgrep has no zsh parser and only partial bash rules. On a 9,000-line zsh script with a symlink privilege escalation, a leaked token, and forgeable caches, it reported **0 findings**. Zero findings never means clean, so Step 4 stays mandatory.
+- **Treat the scan as a supplement, not coverage.** Semgrep has no zsh parser and only partial bash rules. It can report **0 findings** on a large zsh script that has a symlink privilege escalation, a leaked token, and forgeable caches. Zero findings never means clean, so Step 4 stays mandatory.
 - **Check what the scan skipped.** Semgrep scans only git-tracked files, skips files over 1 MB, and honors a `.semgrepignore` in the target. List any exclusions and parse errors (`.errors[]`) under Scope caveats.
   - Without `--verbose`, `.paths.skipped` in the JSON is empty. Take the size-skip count from the `semgrep.err` summary ("Files larger than 1.0 MB: N") and name the files with `find "$target" -path '*/.git' -prune -o -type f -size +1000k -print`.
   - Parse errors from `p/ci` on the embedded bash in GitHub Actions `run:` blocks are common and are the scanner's limitation, not a defect in the target. Count them and move on.
@@ -274,7 +274,7 @@ Before writing, check the reports directory for an existing Monocle report on th
 - Never copy a previous report into a new file without a fresh citation pass. A copied report with only the Date changed is stale evidence.
 - When a prior report covers a different ref of the same target, give the score change in the new report's **Monocle Score** header line, for example "up from 48 at `abc1234`". Recompute the prior score with the current weights if the prior report predates the Monocle Score or used different weights, and say so.
 - When a prior report covers an earlier ref, add a **Score change** line under the score's Total. It lists which prior findings are closed, which persist, and which findings are new. For each new finding, check the prior ref (`git show <prior-sha>:<file> | grep -nF 'snippet'`). If the code was already there, say the prior report missed it; don't credit or blame the new release for it.
-- Targets often claim fixes "based on a Monocle review" in their CHANGELOG. Verify each claimed fix against the code (Secrets: "Verify the target's own security claims"), and credit the verified ones in the Low/Info roll-up.
+- When a target's CHANGELOG claims fixes from an earlier review (for example, "based on a Monocle review"), verify each claimed fix against the code (Secrets: "Verify the target's own security claims"), and credit the verified ones in the Low/Info roll-up.
 
 1. Load the reference file for each view you will write. Load them one at a time, as you write.
 2. Write the views in this order: **Executive → Security → Manager → Engineer**. The Executive view goes first because it is the one people are most likely to read; build it from the fact sheet, not from the other views.
@@ -363,7 +363,7 @@ A raw score above the range is **capped** at its top; a raw score below it is **
 
 **Consistency.** Because of the band limits, the band follows from the Security view's Overall risk: Critical gives 0–39, High 25–69, Medium 50–89, and only Low or better reaches Excellent. Check that the Recommendation fits as well. Excellent with "Hold" or "Do not run", Good or better alongside a Critical finding, or the Critical band with no Critical finding, means a severity or the recommendation is wrong. In that case, recheck the severities and the recommendation rather than changing the score.
 
-**Worked example.** A Jamf Self Service tool that repairs, resets, or removes an office suite. It offers about 20 actions, including removing the EDR agent, and a Jamf parameter supplies an allowlist of actions. An earlier scoring scheme rated it 7/100 (Critical) with no Critical finding. Under these rules:
+**Worked example.** Suppose a Jamf Self Service tool repairs, resets, or removes an office suite. It offers about 20 actions, including removing the EDR agent, and a Jamf parameter supplies an allowlist of actions. Under these rules:
 
 - **Findings at the baseline.**
 
@@ -378,7 +378,7 @@ A raw score above the range is **capped** at its top; a raw score below it is **
   | S9 | — | Info | 0 |
 
   Security total: 43.
-- **Non-security.** 9 endpoint issues cost 18. The `eval` and forced tag push in a local release helper, and a sync script that pushes to origin, are maintainer tooling: not scored.
+- **Non-security.** 9 endpoint issues cost 18. Issues in a local release helper and a repo sync script are maintainer tooling: not scored.
 - **Headline:** 100 − 61 = **39/100 (Poor)**. The High range (25–69) doesn't bind.
 - **Alternate:** suppose any interactive policy leaves the allowlist blank, the wrapper is deployed, and `/usr/local/bin` is user-owned. Then S2 is High, S3 Medium, and S5 Medium: 100 − (73 + 18) = 9, **floored at 25 → 25/100 (Poor)**.
 - **Operator baseline:**

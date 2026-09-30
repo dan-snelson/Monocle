@@ -65,7 +65,7 @@ Examples:
 - `monocle this https://github.com/owner/repo/blob/main/script.zsh`
 - `monocle review ./postinstall`
 - `Give me the security view of this script` (attach the file)
-- `Summarize this repo for stakeholders: ~/Projects/setup-your-mac`
+- `Summarize this repo for stakeholders: ~/Projects/jamf-scripts`
 - `$monocle just the engineer view of ./scripts/enroll.zsh` (Codex)
 
 All four views are produced by default. To get a subset, ask for it: "just the executive and manager views".
@@ -74,7 +74,9 @@ Every report is saved to one central directory as `monocle-{target}-{YYYY-MM-DD-
 
 ```bash
 export MONOCLE_REPORTS_DIR="$HOME/Documents/Monocle/reports"
-``` The reply gives the path, the Monocle Score, the overall risk and recommendation, and the findings table. If the directory can't be written, the report comes back inline instead.
+```
+
+The reply gives the path, the Monocle Score, the overall risk and recommendation, and the findings table. If the directory can't be written, the report comes back inline instead.
 
 ### Monocle Score
 

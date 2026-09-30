@@ -111,7 +111,7 @@ Why it's weak: no evidence, no reasons, and action items without owners, effort,
 ### Good
 
 ```markdown
-**Ownership:** Dan Example (Mac Engineering) — script header `# Author: Dan Example`; 47 of 49 commits by the same author. **Bus factor: 1.**
+**Ownership:** James Example (Mac Engineering) — script header `# Author: James Example`; 47 of 49 commits by the same author. **Bus factor: 1.**
 **Maturity:** Working but fragile — solid happy path; every failure exits 0 and nothing alerts.
 **Change risk:** High — runs as root at enrollment on every new Mac, and makes 3 irreversible changes (local admin demotion, FileVault enable, user rename).
 
