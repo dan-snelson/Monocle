@@ -1,0 +1,79 @@
+name: Documentation
+description: Report missing, unclear, or outdated documentation for Monocle
+title: "[Docs]: "
+labels: ["documentation"]
+assignees:
+  - dan-snelson
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for documentation-only issues: README gaps, install or usage guidance, scoring explanations, reference-file drift, examples, or wording updates.
+
+        If the agent behaved incorrectly while following Monocle's instructions, use the **Bug Report** form instead.
+
+  - type: dropdown
+    id: docs-area
+    attributes:
+      label: Which documentation area needs attention?
+      options:
+        - README.md
+        - SECURITY.md
+        - monocle/SKILL.md
+        - View references (executive.md, security.md, manager.md, engineer.md)
+        - Input and scan references (github-input.md, semgrep.md, specialized-checks.md, large-targets.md)
+        - Monocle Score documentation (SKILL.md Step 5, scoring-example.md)
+        - Maintenance references (post-chat-refine.md, binge-and-purge.md, prior-reports.md)
+        - Install or usage instructions
+        - Issue templates
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: What kind of documentation problem is this?
+      options:
+        - Incorrect or outdated information
+        - Missing instructions or example
+        - Confusing wording or structure
+        - Broken link or bad reference
+        - README and SKILL.md disagree
+        - Typo or grammar issue
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-docs
+    attributes:
+      label: What is wrong today?
+      description: Describe the current documentation problem.
+      placeholder: |
+        Example: The README's Monocle Score table lists deductions that no longer match SKILL.md Step 5.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-update
+    attributes:
+      label: What should it say instead?
+      description: Suggest corrected wording, structure, or content when possible.
+      placeholder: |
+        Example: Update the README table to match the current deductions in SKILL.md Step 5.
+    validations:
+      required: true
+
+  - type: input
+    id: affected-links
+    attributes:
+      label: Affected file or URL
+      description: Add the repo path, section heading, or public URL that needs updating.
+      placeholder: "e.g. README.md, monocle/SKILL.md Step 5, or monocle/references/semgrep.md"
+
+  - type: textarea
+    id: supporting-context
+    attributes:
+      label: Supporting context
+      description: Add references, related commits, or agent and version context.

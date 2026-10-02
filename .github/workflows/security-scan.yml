@@ -1,0 +1,651 @@
+# Protects Monocle from common vulnerabilities with Semgrep, Gitleaks,
+# documented-command syntax checks, ShellCheck, and skill-integrity checks.
+# Monocle ships no executable scripts: its attack surface is the Markdown an
+# agent follows (monocle/SKILL.md and monocle/references/) and the commands
+# fenced inside it. Semgrep scans the full repository, including this
+# workflow, and uploads findings to GitHub code scanning when the repository
+# supports it. Gitleaks scans the full git history for potential secrets,
+# including any that post-chat-refine might copy from a target into the skill.
+# Fenced bash/sh/zsh/python blocks are extracted by
+# .github/scripts/extract_snippets.py, syntax-checked, and linted with
+# ShellCheck (bash/sh only). ShellCheck treats SC2034/SC2154 as informational
+# because snippets reference variables assigned in earlier steps, and
+# SC1090/SC1091 for dynamic sourcing. Skill-integrity checks block hidden
+# Unicode and HTML comments that an agent reads but a rendered view hides, and
+# keep Monocle reports and local agent settings out of version control.
+
+name: Security Scan
+
+on:
+  push:
+    branches:
+      - main
+      - development
+  pull_request:
+    branches:
+      - main
+      - development
+  schedule:
+    - cron: '17 3 * * 3'
+  workflow_dispatch:
+
+permissions: read-all
+
+concurrency:
+  group: security-scan-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  semgrep:
+    name: Semgrep
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    env:
+      SEMGREP_RULES: >-
+        --config p/r2c-security-audit
+        --config p/ci
+        --config p/secrets
+    steps:
+      - name: Check Out Repository
+        # Fetch full history so diff-aware scans and code scanning uploads have the right context.
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Install Semgrep CLI
+        # Use the CLI directly so the blocking scan and SARIF export come from the same execution path.
+        run: python3 -m pip install --upgrade semgrep
+
+      - name: Run Semgrep CLI (Blocking + SARIF)
+        id: semgrep_sarif
+        # Always attempt SARIF generation so findings are kept even when the blocking scan fails.
+        continue-on-error: true
+        shell: bash
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -o pipefail
+
+          baseline_args=()
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" && -n "${PR_BASE_SHA}" ]]; then
+            baseline_args+=(--baseline-commit "${PR_BASE_SHA}")
+          fi
+
+          # Text findings go to the log; SARIF goes to a file. Explicit --config
+          # and --metrics=off match how Monocle itself runs semgrep.
+          semgrep scan \
+            --error \
+            --metrics=off \
+            --disable-version-check \
+            --sarif-output=semgrep.sarif \
+            ${SEMGREP_RULES} \
+            "${baseline_args[@]}"
+
+      - name: Determine SARIF Destination
+        id: sarif_destination
+        if: hashFiles('semgrep.sarif') != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SARIF_UPLOAD_OVERRIDE: ${{ vars.SEMGREP_SARIF_UPLOAD }}
+          IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+        run: |
+          # Code scanning is unavailable on private repositories without GitHub
+          # Code Security. Set the repository variable SEMGREP_SARIF_UPLOAD=true
+          # once it is enabled; until then, SARIF is kept as a workflow artifact.
+          is_private="$(gh api "repos/${GITHUB_REPOSITORY}" --jq '.private' 2>/dev/null || echo unknown)"
+
+          destination="artifact"
+          if [[ "${IS_FORK_PR}" == "true" ]]; then
+            destination="none"
+          elif [[ "${is_private}" == "false" || "${SARIF_UPLOAD_OVERRIDE}" == "true" ]]; then
+            destination="code-scanning"
+          fi
+
+          echo "private=${is_private}" >> "${GITHUB_OUTPUT}"
+          echo "destination=${destination}" >> "${GITHUB_OUTPUT}"
+
+      - name: Normalize SARIF For GitHub
+        id: normalize_sarif
+        if: steps.sarif_destination.outputs.destination == 'code-scanning'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          sarif_path = Path("semgrep.sarif")
+          data = json.loads(sarif_path.read_text())
+
+          severity_map = {
+              "critical": "9.0",
+              "high": "8.9",
+              "medium": "6.9",
+              "low": "3.9",
+              "info": "0.1",
+              "warning": "5.0",
+              "error": "8.0",
+          }
+
+          for run in data.get("runs", []):
+              for rule in run.get("tool", {}).get("driver", {}).get("rules", []):
+                  properties = rule.setdefault("properties", {})
+                  value = properties.get("security-severity")
+                  if isinstance(value, str) and not value.replace(".", "", 1).isdigit():
+                      properties["security-severity"] = severity_map.get(value.lower(), "5.0")
+
+              for result in run.get("results", []):
+                  properties = result.setdefault("properties", {})
+                  value = properties.get("security-severity")
+                  if isinstance(value, str) and not value.replace(".", "", 1).isdigit():
+                      properties["security-severity"] = severity_map.get(value.lower(), "5.0")
+
+          sarif_path.write_text(json.dumps(data))
+          PY
+
+      - name: Upload Semgrep Findings To Code Scanning
+        id: upload_sarif
+        if: steps.sarif_destination.outputs.destination == 'code-scanning'
+        # Repo Actions permissions must allow SARIF uploads or this step will fail even with security-events: write.
+        uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+      - name: Upload Semgrep SARIF As Artifact
+        id: upload_artifact
+        if: steps.sarif_destination.outputs.destination == 'artifact'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: semgrep-sarif
+          path: semgrep.sarif
+          retention-days: 14
+
+      - name: Finalize Semgrep Result
+        if: success() || failure()
+        env:
+          SARIF_OUTCOME: ${{ steps.semgrep_sarif.outcome }}
+          DESTINATION: ${{ steps.sarif_destination.outputs.destination }}
+          UPLOAD_OUTCOME: ${{ steps.upload_sarif.outcome }}
+          ARTIFACT_OUTCOME: ${{ steps.upload_artifact.outcome }}
+        shell: bash
+        run: |
+          coverage="Coverage: full repository scan, including monocle/SKILL.md, monocle/references/, README.md, SECURITY.md, and .github/."
+
+          case "${DESTINATION}" in
+            code-scanning)
+              if [[ "${UPLOAD_OUTCOME}" == "success" ]]; then
+                destination_note="SARIF uploaded to GitHub code scanning."
+                destination_ok=true
+              else
+                destination_note="SARIF upload to code scanning did not complete. Check repository Actions permissions and upload step logs."
+                destination_ok=false
+              fi
+              ;;
+            artifact)
+              if [[ "${ARTIFACT_OUTCOME}" == "success" ]]; then
+                destination_note="Code scanning is unavailable for this private repository; SARIF saved as the \`semgrep-sarif\` workflow artifact."
+                destination_ok=true
+              else
+                destination_note="SARIF artifact upload did not complete. Check upload step logs."
+                destination_ok=false
+              fi
+              ;;
+            none)
+              destination_note="SARIF upload skipped for fork pull requests because write permissions are not available."
+              destination_ok=true
+              ;;
+            *)
+              destination_note="No SARIF file was produced. Check Semgrep output."
+              destination_ok=false
+              ;;
+          esac
+
+          if [[ "${SARIF_OUTCOME}" == "success" && "${destination_ok}" == "true" ]]; then
+            {
+              echo "### Semgrep"
+              echo
+              echo "✅ No issues found"
+              echo
+              echo "${coverage}"
+              echo "${destination_note}"
+            } >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+
+          {
+            echo "### Semgrep"
+            echo
+            if [[ "${SARIF_OUTCOME}" == "success" ]]; then
+              echo "❌ Semgrep scan passed, but SARIF handling needs attention."
+            else
+              echo "❌ Findings detected or Semgrep execution needs attention. Findings are listed in the scan step log."
+            fi
+            echo
+            echo "${coverage}"
+            echo "${destination_note}"
+          } >> "${GITHUB_STEP_SUMMARY}"
+          exit 1
+
+  gitleaks:
+    name: Gitleaks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check Out Repository
+        # Fetch full history so Gitleaks can scan past commits on protected branches.
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks (Blocking)
+        id: gitleaks_scan
+        continue-on-error: true
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # PR comments stay off to keep Gitleaks read-only.
+          GITLEAKS_ENABLE_COMMENTS: "false"
+          GITLEAKS_ENABLE_SUMMARY: "true"
+          # Future tuning examples:
+          # GITLEAKS_CONFIG: .gitleaks.toml
+          # Use `.gitleaksignore` or allowlists for accepted false positives, such as
+          # redacted example credentials in monocle/references/security.md.
+          # Org-owned repos also need GITLEAKS_LICENSE in repository or organization secrets.
+
+      - name: Finalize Gitleaks Result
+        if: success() || failure()
+        shell: bash
+        env:
+          SCAN_OUTCOME: ${{ steps.gitleaks_scan.outcome }}
+        run: |
+          coverage="Coverage: full git history, including monocle/SKILL.md, monocle/references/, and other tracked content."
+
+          if [[ "${SCAN_OUTCOME}" == "success" ]]; then
+            {
+              echo "### Gitleaks"
+              echo
+              echo "✅ No leaks found"
+              echo
+              echo "${coverage}"
+              echo "PR comments are disabled in this workflow to keep Gitleaks read-only."
+            } >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+
+          {
+            echo "### Gitleaks"
+            echo
+            echo "❌ Potential secrets detected or Gitleaks execution failed."
+            echo
+            echo "${coverage}"
+            echo "If post-chat-refine copied a credential from a target into the skill, rotate it and purge it from history; deleting the line is not enough."
+            echo "Tune accepted false positives with \`.gitleaks.toml\` or \`.gitleaksignore\` if needed."
+          } >> "${GITHUB_STEP_SUMMARY}"
+          exit 1
+
+  snippet_syntax:
+    name: Snippet Syntax
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Out Repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Install Zsh
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes zsh
+
+      - name: Extract Fenced Snippets
+        id: extract
+        shell: bash
+        run: |
+          python3 .github/scripts/extract_snippets.py "${RUNNER_TEMP}/snippets"
+          count="$(grep -c '.' "${RUNNER_TEMP}/snippets/manifest.tsv" || true)"
+          echo "count=${count}" >> "${GITHUB_OUTPUT}"
+
+      - name: Run Syntax Checks
+        id: syntax
+        if: steps.extract.outputs.count != '0'
+        continue-on-error: true
+        shell: bash
+        run: |
+          check_snippet() {
+            case "$1" in
+              zsh)    zsh -n "$2" ;;
+              bash)   bash -n "$2" ;;
+              sh)     sh -n "$2" ;;
+              python) python3 -c 'import ast, sys; ast.parse(open(sys.argv[1], encoding="utf-8").read(), sys.argv[1])' "$2" ;;
+            esac
+          }
+
+          status=0
+          while IFS=$'\t' read -r kind md_file fence_line _ snippet; do
+            [[ -z "${kind}" ]] && continue
+            if ! check_snippet "${kind}" "${snippet}"; then
+              status=1
+              echo "::error file=${md_file},line=${fence_line}::Fenced ${kind} block fails syntax check"
+            fi
+          done < "${RUNNER_TEMP}/snippets/manifest.tsv"
+
+          echo "status=${status}" >> "${GITHUB_OUTPUT}"
+
+      - name: Finalize Snippet Syntax Result
+        if: success() || failure()
+        shell: bash
+        env:
+          TARGET_COUNT: ${{ steps.extract.outputs.count }}
+          SYNTAX_STATUS: ${{ steps.syntax.outputs.status }}
+        run: |
+          if [[ "${TARGET_COUNT}" == "0" ]]; then
+            {
+              echo "### Snippet Syntax"
+              echo
+              echo "✅ No fenced bash/sh/zsh/python blocks found in tracked Markdown."
+            } >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+
+          {
+            echo "### Snippet Syntax"
+            echo
+            echo "- Blocks checked: ${TARGET_COUNT}"
+            echo "- Coverage: fenced bash/sh/zsh/python blocks in monocle/SKILL.md, monocle/references/, and README.md (\`zsh -n\`, \`bash -n\`, \`sh -n\`, Python \`ast.parse\`)."
+            echo
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          if [[ "${SYNTAX_STATUS}" == "0" ]]; then
+            echo "✅ All fenced blocks passed syntax checks" >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+
+          echo "❌ Fenced block syntax errors found" >> "${GITHUB_STEP_SUMMARY}"
+          exit 1
+
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Out Repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Extract Fenced Shell Snippets
+        id: extract
+        shell: bash
+        run: |
+          python3 .github/scripts/extract_snippets.py "${RUNNER_TEMP}/snippets"
+          awk -F'\t' '$1 == "bash" || $1 == "sh"' "${RUNNER_TEMP}/snippets/manifest.tsv" > "${RUNNER_TEMP}/shellcheck-manifest.tsv"
+          count="$(grep -c '.' "${RUNNER_TEMP}/shellcheck-manifest.tsv" || true)"
+          echo "count=${count}" >> "${GITHUB_OUTPUT}"
+
+      - name: Install ShellCheck
+        if: steps.extract.outputs.count != '0'
+        # Native ShellCheck keeps permissions minimal while still producing strong annotations.
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes shellcheck
+
+      - name: Run Blocking ShellCheck Pass
+        id: shellcheck_blocking
+        if: steps.extract.outputs.count != '0'
+        continue-on-error: true
+        shell: bash
+        run: |
+          cut -f5 "${RUNNER_TEMP}/shellcheck-manifest.tsv" > "${RUNNER_TEMP}/shellcheck-files.txt"
+          mapfile -t shell_files < "${RUNNER_TEMP}/shellcheck-files.txt"
+
+          set +e
+          shellcheck --severity=style --format=gcc -e SC1090,SC1091,SC2034,SC2154 "${shell_files[@]}" > shellcheck-blocking.gcc
+          status=$?
+          set -e
+
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          def escape_workflow_command(value):
+              return value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+          # Map each snippet back to its Markdown file, fence line, and indent.
+          origins = {}
+          for row in Path(os.environ["RUNNER_TEMP"], "shellcheck-manifest.tsv").read_text().splitlines():
+              _, md_file, fence_line, indent, snippet = row.split("\t")
+              origins[snippet] = (md_file, int(fence_line), int(indent))
+
+          pattern = re.compile(r"^(.*?):(\d+):(\d+):\s+([a-z]+):\s+(.*)$")
+          for line in Path("shellcheck-blocking.gcc").read_text().splitlines():
+              match = pattern.match(line)
+              if not match or match.group(1) not in origins:
+                  print(line)
+                  continue
+              snippet, line_no, col_no, level, message = match.groups()
+              md_file, fence_line, indent = origins[snippet]
+              annotation = "error" if level == "error" else "warning"
+              print(f"::{annotation} file={md_file},line={fence_line + int(line_no) - 1},col={int(col_no) + indent}::{escape_workflow_command(message)}")
+          PY
+
+          issue_count="$(grep -c '.' shellcheck-blocking.gcc || true)"
+          echo "status=${status}" >> "${GITHUB_OUTPUT}"
+          echo "issue_count=${issue_count}" >> "${GITHUB_OUTPUT}"
+
+      - name: Run Informational ShellCheck Pass
+        id: shellcheck_info
+        if: steps.extract.outputs.count != '0'
+        continue-on-error: true
+        shell: bash
+        run: |
+          mapfile -t shell_files < "${RUNNER_TEMP}/shellcheck-files.txt"
+
+          set +e
+          shellcheck --severity=style --format=gcc -i SC1090,SC1091,SC2034,SC2154 "${shell_files[@]}" > shellcheck-info.gcc
+          status=$?
+          set -e
+
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          def escape_workflow_command(value):
+              return value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+          origins = {}
+          for row in Path(os.environ["RUNNER_TEMP"], "shellcheck-manifest.tsv").read_text().splitlines():
+              _, md_file, fence_line, indent, snippet = row.split("\t")
+              origins[snippet] = (md_file, int(fence_line), int(indent))
+
+          pattern = re.compile(r"^(.*?):(\d+):(\d+):\s+([a-z]+):\s+(.*)$")
+          for line in Path("shellcheck-info.gcc").read_text().splitlines():
+              match = pattern.match(line)
+              if not match or match.group(1) not in origins:
+                  print(line)
+                  continue
+              snippet, line_no, col_no, _, message = match.groups()
+              md_file, fence_line, indent = origins[snippet]
+              print(f"::notice file={md_file},line={fence_line + int(line_no) - 1},col={int(col_no) + indent}::{escape_workflow_command(message)}")
+          PY
+
+          issue_count="$(grep -c '.' shellcheck-info.gcc || true)"
+          echo "status=${status}" >> "${GITHUB_OUTPUT}"
+          echo "issue_count=${issue_count}" >> "${GITHUB_OUTPUT}"
+
+      - name: Finalize ShellCheck Result
+        if: success() || failure()
+        shell: bash
+        env:
+          TARGET_COUNT: ${{ steps.extract.outputs.count }}
+          BLOCKING_STATUS: ${{ steps.shellcheck_blocking.outputs.status }}
+          BLOCKING_ISSUES: ${{ steps.shellcheck_blocking.outputs.issue_count }}
+          INFO_ISSUES: ${{ steps.shellcheck_info.outputs.issue_count }}
+        run: |
+          if [[ "${TARGET_COUNT}" == "0" ]]; then
+            {
+              echo "### ShellCheck"
+              echo
+              echo "✅ No fenced bash/sh blocks found in tracked Markdown."
+            } >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+
+          {
+            echo "### ShellCheck"
+            echo
+            echo "- Blocks scanned: ${TARGET_COUNT}"
+            echo "- Blocking findings: ${BLOCKING_ISSUES:-0}"
+            echo "- Informational findings (SC1090/SC1091/SC2034/SC2154): ${INFO_ISSUES:-0}"
+            echo "- Coverage: fenced bash/sh blocks in tracked Markdown; zsh blocks are covered by Snippet Syntax only."
+            echo
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          if [[ "${BLOCKING_STATUS}" == "0" ]]; then
+            echo "✅ No blocking ShellCheck issues found" >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+
+          echo "❌ Blocking ShellCheck issues found" >> "${GITHUB_STEP_SUMMARY}"
+          exit 1
+
+  skill_integrity:
+    name: Skill Integrity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Out Repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Run Skill Integrity Checks
+        id: integrity
+        continue-on-error: true
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import re
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          failures = 0
+
+          def fail(message, file_name=None, line_no=None):
+              global failures
+              failures += 1
+              location = f" file={file_name}" if file_name else ""
+              if file_name and line_no:
+                  location += f",line={line_no}"
+              print(f"::error{location}::{message}")
+
+          # Characters an agent reads but a rendered view hides: zero-width,
+          # bidirectional controls, invisible operators, BOM, and Unicode tags.
+          hidden = re.compile(
+              "[\u00ad\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2064"
+              "\u2066-\u2069\ufeff\U000e0000-\U000e007f]"
+          )
+
+          tracked = subprocess.check_output(["git", "ls-files"], text=True).splitlines()
+          for file_name in tracked:
+              try:
+                  text = Path(file_name).read_text(encoding="utf-8")
+              except (UnicodeDecodeError, IsADirectoryError):
+                  continue
+              for line_no, line in enumerate(text.splitlines(), 1):
+                  found = hidden.findall(line)
+                  if found:
+                      codes = ", ".join(sorted({f"U+{ord(c):04X}" for c in found}))
+                      fail(f"Hidden or bidirectional Unicode ({codes})", file_name, line_no)
+                  if file_name.endswith(".md") and "<!--" in line:
+                      fail("HTML comment in Markdown is invisible when rendered but read by agents", file_name, line_no)
+
+          # Reports contain security findings and must never be committed.
+          report_name = re.compile(r"(^|/)monocle-[a-z0-9._-]+-\d{4}-\d{2}-\d{2}-\d{4}(-\d+)?\.md$")
+          for file_name in tracked:
+              if file_name.startswith("reports/") or report_name.search(file_name):
+                  fail("Monocle report is tracked; remove it with `git rm --cached` and purge it from history", file_name)
+
+          if subprocess.run(["git", "check-ignore", "-q", "--no-index", "reports/probe.md"]).returncode != 0:
+              fail("`.gitignore` no longer excludes /reports/", ".gitignore")
+
+          # Per-user agent permissions and paths stay local.
+          for file_name in tracked:
+              if re.search(r"(^|/)\.claude/settings\.local\.json$", file_name):
+                  fail("Local agent settings are tracked", file_name)
+
+          sys.exit(1 if failures else 0)
+          PY
+
+      - name: Finalize Skill Integrity Result
+        if: success() || failure()
+        shell: bash
+        env:
+          INTEGRITY_OUTCOME: ${{ steps.integrity.outcome }}
+        run: |
+          {
+            echo "### Skill Integrity"
+            echo
+            echo "- Coverage: hidden or bidirectional Unicode in all tracked text files, HTML comments in tracked Markdown, tracked Monocle reports, the /reports/ gitignore rule, and tracked \`.claude/settings.local.json\`."
+            echo
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          if [[ "${INTEGRITY_OUTCOME}" == "success" ]]; then
+            echo "✅ Skill integrity checks passed" >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+
+          echo "❌ Skill integrity issues found; see step annotations" >> "${GITHUB_STEP_SUMMARY}"
+          exit 1
+
+  summary:
+    name: Security Scan Summary
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - semgrep
+      - gitleaks
+      - snippet_syntax
+      - shellcheck
+      - skill_integrity
+    steps:
+      - name: Security Scan Complete
+        if: success() || failure()
+        shell: bash
+        env:
+          SEMGREP_RESULT: ${{ needs.semgrep.result }}
+          GITLEAKS_RESULT: ${{ needs.gitleaks.result }}
+          SNIPPET_SYNTAX_RESULT: ${{ needs.snippet_syntax.result }}
+          SHELLCHECK_RESULT: ${{ needs.shellcheck.result }}
+          SKILL_INTEGRITY_RESULT: ${{ needs.skill_integrity.result }}
+        run: |
+          badge() {
+            case "$1" in
+              success) printf "✅" ;;
+              skipped) printf "⏭️" ;;
+              cancelled) printf "🚫" ;;
+              *) printf "❌" ;;
+            esac
+          }
+
+          line="Semgrep $(badge "${SEMGREP_RESULT}") | Gitleaks $(badge "${GITLEAKS_RESULT}") | Snippet Syntax $(badge "${SNIPPET_SYNTAX_RESULT}") | ShellCheck $(badge "${SHELLCHECK_RESULT}") | Skill Integrity $(badge "${SKILL_INTEGRITY_RESULT}")"
+          coverage="Coverage: monocle/SKILL.md, monocle/references/, and their fenced commands, plus full-repository Semgrep and Gitleaks scans and report-hygiene checks."
+
+          result="passed"
+          for job_result in "${SEMGREP_RESULT}" "${GITLEAKS_RESULT}" "${SNIPPET_SYNTAX_RESULT}" "${SHELLCHECK_RESULT}" "${SKILL_INTEGRITY_RESULT}"; do
+            [[ "${job_result}" == "success" ]] || result="requires attention"
+          done
+
+          {
+            echo "## Security Scan Summary"
+            echo
+            echo "${line}"
+            echo
+            echo "${coverage}"
+            echo
+            echo "Monocle security scan ${result}."
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          echo "${line}"
+          echo "${coverage}"
+          echo "Monocle security scan ${result}."
+          [[ "${result}" == "passed" ]]

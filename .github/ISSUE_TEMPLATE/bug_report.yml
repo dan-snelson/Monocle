@@ -1,0 +1,158 @@
+name: Bug Report
+description: Something is sideways with Monocle
+title: "[Bug]: "
+labels: ["bug"]
+assignees:
+  - dan-snelson
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Thank you** for taking time to file a bug report for Monocle!
+
+        Please complete the following form with as much detail as possible.
+
+        If you're not sure about something, do your best. (The more information included, the easier it is to investigate and _hopefully_ resolve your issue.)
+
+        Inaccurate findings, missed issues, and Monocle Score disagreements are welcome here. If you have found a **security vulnerability in Monocle itself**, do **not** file it here; follow the [Security Policy](https://github.com/dan-snelson/Monocle/security/policy) instead.
+
+        **Monocle reports describe exploitable weaknesses in the analyzed target.** Never paste a full report, a target's secrets, internal hostnames, or usernames into this public issue. Share only short, sanitized excerpts.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before you submit
+      options:
+        - label: I reproduced this with a current copy of `monocle/` from `main` or `development`
+          required: true
+        - label: I removed secrets, hostnames, usernames, and other identifying details from everything below
+          required: true
+        - label: This is not a security vulnerability in Monocle (see the [Security Policy](https://github.com/dan-snelson/Monocle/security/policy))
+          required: true
+
+  - type: input
+    id: monocle-commit
+    attributes:
+      label: Monocle commit
+      description: From `git -C /path/to/Monocle rev-parse --short HEAD`, or the commit you copied `monocle/` from.
+      placeholder: "e.g. 55ec8fb"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Which agent ran Monocle?
+      options:
+        - Claude Code
+        - Codex
+        - Something else not on this list
+    validations:
+      required: true
+
+  - type: input
+    id: agent-version
+    attributes:
+      label: Agent version
+      description: From `claude --version` or `codex --version`.
+      placeholder: "e.g. 2.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Model
+      description: The model the agent was using, if known.
+      placeholder: "e.g. claude-opus-5-5"
+
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: How is Monocle installed?
+      options:
+        - Copied into a personal skills directory (`cp -Rv monocle ...`)
+        - Symlinked to a checkout of this repo (`ln -s ...`)
+        - Project- or repo-scoped skills directory
+        - Something else not on this list
+    validations:
+      required: true
+
+  - type: dropdown
+    id: input-type
+    attributes:
+      label: What was Monocle reviewing?
+      options:
+        - GitHub URL
+        - Attached file(s)
+        - Local path
+        - Diagnostic or support bundle
+        - Pasted code
+    validations:
+      required: true
+
+  - type: dropdown
+    id: affected-area
+    attributes:
+      label: Which area looks broken?
+      options:
+        - Input detection / GitHub fetch
+        - Scoping / large targets
+        - Findings accuracy (false positive or missed issue)
+        - Monocle Score calculation / bands
+        - Executive, Security, Manager, or Engineer view content
+        - Semgrep scan
+        - Report writing / reports directory
+        - post-chat-refine
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe actual behavior.
+      placeholder: |
+        Example: Monocle rated a Medium finding but the Monocle Score landed at 92, outside the 50-89 range for the most severe finding.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: What did you expect to happen?
+      placeholder: |
+        Example: The score should have been capped at 89 per SKILL.md Step 5.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps make bugs much easier to act on. A minimal, non-sensitive target is the most helpful thing you can include.
+      placeholder: |
+        1. Install Monocle by copying `monocle/` into `~/.claude/skills/`
+        2. Save the minimal target below as `./postinstall`
+        3. Run `monocle this ./postinstall`
+        4. Observe the unexpected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostic artifacts
+      description: Drag and drop **sanitized** attachments here.
+      placeholder: |
+        Attach any of the following when available:
+        - A minimal target that reproduces the issue
+        - The relevant agent transcript excerpt
+        - The relevant report section (never the full report), with secrets redacted
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Anything else
+      description: Include permission or sandbox mode, Semgrep version, workarounds, or environment details that do not fit above.
