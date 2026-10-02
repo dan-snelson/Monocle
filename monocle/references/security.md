@@ -186,6 +186,7 @@ Why it's weak: no location, no evidence, no specific impact, and a generic fix.
 - **Process-list exposure:** secrets in command-line args (`curl -u`, `-H "Authorization: …"`, `security add-generic-password -w pass`). Prefer stdin, `--config`, or `-K -`.
 - **`set -x` / `xtrace`** combined with secrets means secrets end up in logs.
 - **`sudo` inside a root script** is usually redundant. `sudo -u user` without `launchctl asuser` is a context bug, not a privilege drop into the GUI session.
+- **zsh indirection is a sink:** `${(P)name}` evaluates a subscript in `name`, including `$(…)`, when the base variable is set; `printf -v "$name"` evaluates it even when unset (zsh 5.9: with `fooX` set, `n='fooX[$(id>out)]'` ran `id` through `${(P)n}`; with it unset, `${(P)n}` ran nothing but `printf -v` still ran `id`). Any variable name built from root-read, user-controlled data, such as the console user's own preferences (`AppleLanguages`, `~/Library/Preferences/…`), is code injection. Case folding (`:l`, `(C)`) doesn't neutralize it: APFS is case-insensitive by default, so `Id` runs `/usr/bin/id`. Fix with an allowlist regex before use, or an associative array keyed by the value.
 - **zsh specifics:** `setopt` changes can alter word splitting. `$=var` forces splitting. Unquoted `$var` doesn't word-split in zsh the way it does in bash, but it does glob, and empty vars vanish.
 
 ### Python
