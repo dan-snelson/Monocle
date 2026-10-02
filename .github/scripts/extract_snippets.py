@@ -9,7 +9,8 @@ check and lint it, and records where it came from in manifest.tsv:
     <kind>\t<markdown file>\t<fence line>\t<indent>\t<snippet path>
 
 Snippet line N (line 1 is the added shebang) maps to Markdown line
-<fence line> + N - 1, column + <indent>.
+<fence line> + N - 1, column + <indent>. CommonMark backtick and tilde
+fences are supported, including fences longer than three characters.
 
 Usage: extract_snippets.py <output directory>
 """
@@ -19,8 +20,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-FENCE_OPEN = re.compile(r"^(\s*)```([A-Za-z0-9_+-]*)\s*$")
-FENCE_CLOSE = re.compile(r"^\s*```\s*$")
+FENCE_OPEN = re.compile(r"^(\s*)(`{3,}|~{3,})\s*(?:([A-Za-z0-9_+-]+)\b.*)?$")
 KINDS = {"bash": "bash", "sh": "sh", "zsh": "zsh", "python": "python", "py": "python"}
 SHEBANGS = {
     "bash": "#!/bin/bash\n",
@@ -29,6 +29,11 @@ SHEBANGS = {
     "python": "#!/usr/bin/env python3\n",
 }
 EXTENSIONS = {"bash": "bash", "sh": "sh", "zsh": "zsh", "python": "py"}
+
+
+def is_closing_fence(line, fence):
+    marker = re.escape(fence[0])
+    return re.match(rf"^\s*{marker}{{{len(fence)},}}\s*$", line) is not None
 
 
 def main():
@@ -46,10 +51,11 @@ def main():
                 continue
 
             indent = len(match.group(1))
-            kind = KINDS.get(match.group(2).lower())
+            fence = match.group(2)
+            kind = KINDS.get((match.group(3) or "").lower())
             fence_line = i + 1
             j = i + 1
-            while j < len(lines) and not FENCE_CLOSE.match(lines[j]):
+            while j < len(lines) and not is_closing_fence(lines[j], fence):
                 j += 1
 
             if kind:

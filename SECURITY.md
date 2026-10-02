@@ -51,7 +51,7 @@ You should receive an acknowledgment within **48 hours**. We will work with you 
 - Install Monocle only from this repository, and review `monocle/` before installing it.
 - Run Monocle with your agent's permission prompts or sandbox enabled. Monocle analyzes untrusted code, so review any command the agent proposes that isn't a read, fetch, or static scan.
 - Treat every report as sensitive. Reports describe exploitable weaknesses in the target, so don't commit them or attach them to public issues.
-- If you set `MONOCLE_REPORTS_DIR` inside a git repository, gitignore that path there.
+- If you set `MONOCLE_REPORTS_DIR` inside a git repository, gitignore that path there before running Monocle.
 - For bundles you intend to share publicly, use Monocle's verdict as one input and still review the bundle yourself before posting it.
 - Review the diff after accepting **post-chat-refine** and before committing it. Confirm that no target names, hostnames, usernames, version strings, or secrets were added to the skill files.
 

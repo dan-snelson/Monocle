@@ -10,7 +10,13 @@ How to cover a target that is over the SKILL.md Step 2 limits, or a single file 
 
 One script can blow the limit on its own (for example, a 9,000-line zsh file). Don't read it top to bottom, and don't skip it. Instead:
 
-1. Count lines with `wc -l`, then map the structure: `grep -nE '^(function )?[A-Za-z_][A-Za-z0-9_]*\s*\(\)\s*\{|^####' file`.
+1. Count lines with `wc -l`, then map the structure with a pattern for the detected language:
+   - Shell: `grep -nE '^(function )?[A-Za-z_][A-Za-z0-9_]*\s*\(\)\s*\{|^####' file`
+   - Python: `grep -nE '^(class|def|async def) [A-Za-z_][A-Za-z0-9_]*|^if __name__ == .__main__.' file`
+   - Swift: `grep -nE '^\s*(class|struct|enum|actor|protocol|extension|func|init)\b|@main|UIApplicationMain' file`
+   - AppleScript: `grep -nE '^on [A-Za-z_][A-Za-z0-9_]*|^script |^property ' file`
+   - Markdown or mixed instruction files: `grep -nE '^#{1,6} ' file`
+   If the pattern returns nothing, use a parser or language-aware search before choosing regions.
 2. Read these regions in full, in this order:
    1. Globals and parameter parsing.
    2. Pre-flight checks and early exits.

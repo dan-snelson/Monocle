@@ -86,7 +86,7 @@ Every report is saved to one central directory as `monocle-{target}-{YYYY-MM-DD-
 2. This repo's `reports/` directory, when the skill runs from this checkout, including through a symlink (see below).
 3. Otherwise `~/monocle-reports`, which is what a copied install (`cp -Rv monocle …`) uses.
 
-Reports contain security findings, so keep them out of version control. This repo's `.gitignore` already excludes `/reports/`; if you point `MONOCLE_REPORTS_DIR` inside another git repo, gitignore it there. To keep reports in this repo from any project, install with a symlink instead of a copy:
+Reports contain security findings, so keep them out of version control. This repo's `.gitignore` already excludes `/reports/`; if you point `MONOCLE_REPORTS_DIR` inside another git repo, gitignore it there before running Monocle. Monocle never chooses the target repo as a report destination automatically, but an explicit `MONOCLE_REPORTS_DIR` override is honored after the ignore check. To keep reports in this repo from any project, install with a symlink instead of a copy:
 
 ```zsh
 ln -s "$PWD/monocle" ~/.claude/skills/monocle

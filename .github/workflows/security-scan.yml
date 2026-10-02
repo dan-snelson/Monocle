@@ -70,9 +70,12 @@ jobs:
           set -o pipefail
 
           baseline_args=()
+          coverage_mode="full"
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" && -n "${PR_BASE_SHA}" ]]; then
             baseline_args+=(--baseline-commit "${PR_BASE_SHA}")
+            coverage_mode="pull-request diff-aware"
           fi
+          echo "coverage_mode=${coverage_mode}" >> "${GITHUB_OUTPUT}"
 
           # Text findings go to the log; SARIF goes to a file. Explicit --config
           # and --metrics=off match how Monocle itself runs semgrep.
@@ -99,9 +102,7 @@ jobs:
           is_private="$(gh api "repos/${GITHUB_REPOSITORY}" --jq '.private' 2>/dev/null || echo unknown)"
 
           destination="artifact"
-          if [[ "${IS_FORK_PR}" == "true" ]]; then
-            destination="none"
-          elif [[ "${is_private}" == "false" || "${SARIF_UPLOAD_OVERRIDE}" == "true" ]]; then
+          if [[ "${IS_FORK_PR}" != "true" && ( "${is_private}" == "false" || "${SARIF_UPLOAD_OVERRIDE}" == "true" ) ]]; then
             destination="code-scanning"
           fi
 
@@ -168,12 +169,17 @@ jobs:
         if: success() || failure()
         env:
           SARIF_OUTCOME: ${{ steps.semgrep_sarif.outcome }}
+          COVERAGE_MODE: ${{ steps.semgrep_sarif.outputs.coverage_mode }}
           DESTINATION: ${{ steps.sarif_destination.outputs.destination }}
           UPLOAD_OUTCOME: ${{ steps.upload_sarif.outcome }}
           ARTIFACT_OUTCOME: ${{ steps.upload_artifact.outcome }}
         shell: bash
         run: |
-          coverage="Coverage: full repository scan, including monocle/SKILL.md, monocle/references/, README.md, SECURITY.md, and .github/."
+          if [[ "${COVERAGE_MODE}" == "pull-request diff-aware" ]]; then
+            coverage="Coverage: pull-request diff-aware scan using the PR base commit. Pre-existing findings may be suppressed; push and scheduled runs scan the full repository."
+          else
+            coverage="Coverage: full repository scan, including monocle/SKILL.md, monocle/references/, README.md, SECURITY.md, and .github/."
+          fi
 
           case "${DESTINATION}" in
             code-scanning)
@@ -193,10 +199,6 @@ jobs:
                 destination_note="SARIF artifact upload did not complete. Check upload step logs."
                 destination_ok=false
               fi
-              ;;
-            none)
-              destination_note="SARIF upload skipped for fork pull requests because write permissions are not available."
-              destination_ok=true
               ;;
             *)
               destination_note="No SARIF file was produced. Check Semgrep output."
@@ -245,7 +247,7 @@ jobs:
       - name: Run Gitleaks (Blocking)
         id: gitleaks_scan
         continue-on-error: true
-        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # PR comments stay off to keep Gitleaks read-only.
@@ -628,7 +630,11 @@ jobs:
           }
 
           line="Semgrep $(badge "${SEMGREP_RESULT}") | Gitleaks $(badge "${GITLEAKS_RESULT}") | Snippet Syntax $(badge "${SNIPPET_SYNTAX_RESULT}") | ShellCheck $(badge "${SHELLCHECK_RESULT}") | Skill Integrity $(badge "${SKILL_INTEGRITY_RESULT}")"
-          coverage="Coverage: monocle/SKILL.md, monocle/references/, and their fenced commands, plus full-repository Semgrep and Gitleaks scans and report-hygiene checks."
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            coverage="Coverage: monocle/SKILL.md, monocle/references/, and their fenced commands, plus pull-request diff-aware Semgrep, full-history Gitleaks, and report-hygiene checks."
+          else
+            coverage="Coverage: monocle/SKILL.md, monocle/references/, and their fenced commands, plus full-repository Semgrep, full-history Gitleaks, and report-hygiene checks."
+          fi
 
           result="passed"
           for job_result in "${SEMGREP_RESULT}" "${GITLEAKS_RESULT}" "${SNIPPET_SYNTAX_RESULT}" "${SHELLCHECK_RESULT}" "${SKILL_INTEGRITY_RESULT}"; do

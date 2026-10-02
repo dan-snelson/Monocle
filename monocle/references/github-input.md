@@ -40,9 +40,19 @@ Patterns: `github.com/{owner}/{repo}/blob/{ref}/{path}` or `raw.githubuserconten
 Patterns: `github.com/{owner}/{repo}` or `github.com/{owner}/{repo}/tree/{ref}/{path}`
 
 1. Validate the URL components as in **Safe URL handling**. For a bare repo URL, use the default branch as `$ref` and resolve it to `$sha`.
-2. Get repo metadata: `gh repo view "$owner/$repo" --json name,description,defaultBranchRef,pushedAt,licenseInfo,isArchived`.
-3. Get the file tree: `gh api "repos/$owner/$repo/git/trees/$sha?recursive=1" --jq '.tree[] | select(.type=="blob") | .path'`.
-4. Summarize the structure in 3–8 lines: languages, top-level layout, apparent entry points, and packaging (pkg scripts, Jamf, LaunchDaemons, CI).
-5. Pick files to analyze using the entry-point heuristics in SKILL.md Step 2, then fetch them as in A.
-6. Clone shallowly into a scratch directory (`git clone --depth 1 --branch "$ref" "https://github.com/$owner/$repo.git" "$scratch/$repo"`) and treat it as a local path when `gh` is unavailable, **or** when the repo is near or over the SKILL.md Step 2 limits, because you will grep across it repeatedly. `--branch` takes branch and tag names only; for a SHA ref, clone the default branch and `git fetch --depth 1 origin "$sha"` then `git checkout FETCH_HEAD`. Record the SHA with `git rev-parse HEAD`.
-7. A shallow clone holds one commit, so `git log` is useless for ownership. Use `gh api "repos/$owner/$repo/contributors" --jq '.[] | "\(.contributions)\t\(.login)"'`, `gh api "repos/$owner/$repo/commits?per_page=5"`, and `gh api "repos/$owner/$repo/releases/latest"` instead.
+2. Get repo metadata when `gh` is available: `gh repo view "$owner/$repo" --json name,description,defaultBranchRef,pushedAt,licenseInfo,isArchived`.
+3. Get the file tree when `gh` is available: `gh api "repos/$owner/$repo/git/trees/$sha?recursive=1" --jq '.tree[] | select(.type=="blob") | .path'`.
+4. If `gh` is unavailable, resolve refs without it before cloning:
+
+   ```bash
+   remote="https://github.com/$owner/$repo.git"
+   default_ref=$(git ls-remote --symref "$remote" HEAD | awk '/^ref:/ { sub("refs/heads/", "", $2); print $2 }')
+   ref="${ref:-$default_ref}"
+   git ls-remote --exit-code "$remote" "$ref" "refs/heads/$ref" "refs/tags/$ref"
+   ```
+
+   If the URL is a `tree` URL and the ref/path split is still ambiguous without `gh`, clone the default branch into scratch first, then resolve the longest prefix that exists as a ref with `git -C "$scratch/$repo" rev-parse --verify "$candidate^{commit}"`; the remainder is the directory path. If no prefix resolves, fail explicitly under SKILL.md Failure modes instead of guessing.
+5. Summarize the structure in 3–8 lines: languages, top-level layout, apparent entry points, and packaging (pkg scripts, Jamf, LaunchDaemons, CI).
+6. Pick files to analyze using the entry-point heuristics in SKILL.md Step 2, then fetch them as in A.
+7. Clone shallowly into a scratch directory (`git clone --depth 1 --branch "$ref" "https://github.com/$owner/$repo.git" "$scratch/$repo"`) and treat it as a local path when `gh` is unavailable, **or** when the repo is near or over the SKILL.md Step 2 limits, because you will grep across it repeatedly. `--branch` takes branch and tag names only; for a SHA ref, clone the default branch and `git fetch --depth 1 origin "$sha"` then `git checkout FETCH_HEAD`. Record the SHA with `git rev-parse HEAD`.
+8. A shallow clone holds one commit, so `git log` is useless for ownership. Use `gh api "repos/$owner/$repo/contributors" --jq '.[] | "\(.contributions)\t\(.login)"'`, `gh api "repos/$owner/$repo/commits?per_page=5"`, and `gh api "repos/$owner/$repo/releases/latest"` instead. If `gh` is unavailable, say contributor/release metadata was not fetched.

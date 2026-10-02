@@ -31,14 +31,34 @@ SKILL.md Step 1 E and Step 4 checks that apply only to some targets. Load this f
 For Step 1 E inputs, and for any shipped log the code writes, pattern-scan the text. It reads straight from the archive, so it works in read-only mode:
 
 ```bash
-d() { unzip -p "$zip" '*.log' '*.txt' '*.json' '*.jsonl' '*.plist' 2>/dev/null; }
-d | grep -inE 'bearer|authorization:|token|secret|passw(or)?d|api[_-]?key|hooks\.slack\.com|webhook\.office\.com|logic\.azure\.com' | cut -c1-200 | head -40
-d | grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' | sort | uniq -c | head
-d | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b|\b([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\b' | sort | uniq -c | head
-d | grep -inE 'serial|hostname|computername|udid|IOPlatform' | cut -c1-200 | head
-d | grep -oE '/Users/[^/ ":]+' | sort | uniq -c
-d | grep -oE 'https?://[^ "<>]+\?[^ "<>]+' | sort -u | head -20   # query strings can carry tokens
-d | grep -oE '\[(DEBUG|INFO|NOTICE|WARNING|ERROR|FAULT)\]' | sort | uniq -c
+unzip -Z1 "$zip" '*.log' '*.txt' '*.json' '*.jsonl' '*.plist' 2>/dev/null |
+while IFS= read -r entry; do
+  unzip -p "$zip" "$entry" 2>/dev/null |
+    grep -inE 'bearer|authorization:|token|secret|passw(or)?d|api[_-]?key|hooks\.slack\.com|webhook\.office\.com|logic\.azure\.com' |
+    sed "s#^#$entry:#" | cut -c1-240
+done | head -40
+
+unzip -Z1 "$zip" '*.log' '*.txt' '*.json' '*.jsonl' '*.plist' 2>/dev/null |
+while IFS= read -r entry; do unzip -p "$zip" "$entry" 2>/dev/null; done |
+  grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' | sort | uniq -c | head
+unzip -Z1 "$zip" '*.log' '*.txt' '*.json' '*.jsonl' '*.plist' 2>/dev/null |
+while IFS= read -r entry; do unzip -p "$zip" "$entry" 2>/dev/null; done |
+  grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b|\b([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\b' | sort | uniq -c | head
+unzip -Z1 "$zip" '*.log' '*.txt' '*.json' '*.jsonl' '*.plist' 2>/dev/null |
+while IFS= read -r entry; do
+  unzip -p "$zip" "$entry" 2>/dev/null |
+    grep -inE 'serial|hostname|computername|udid|IOPlatform' |
+    sed "s#^#$entry:#" | cut -c1-240
+done | head -40
+unzip -Z1 "$zip" '*.log' '*.txt' '*.json' '*.jsonl' '*.plist' 2>/dev/null |
+while IFS= read -r entry; do unzip -p "$zip" "$entry" 2>/dev/null; done |
+  grep -oE '/Users/[^/ ":]+' | sort | uniq -c
+unzip -Z1 "$zip" '*.log' '*.txt' '*.json' '*.jsonl' '*.plist' 2>/dev/null |
+while IFS= read -r entry; do unzip -p "$zip" "$entry" 2>/dev/null; done |
+  grep -oE 'https?://[^ "<>]+\?[^ "<>]+' | sort -u | head -20   # query strings can carry tokens
+unzip -Z1 "$zip" '*.log' '*.txt' '*.json' '*.jsonl' '*.plist' 2>/dev/null |
+while IFS= read -r entry; do unzip -p "$zip" "$entry" 2>/dev/null; done |
+  grep -oE '\[(DEBUG|INFO|NOTICE|WARNING|ERROR|FAULT)\]' | sort | uniq -c
 ```
 
 Many hits are label or product names ("1password", "gitcredentialmanager"), so triage each one. Public vendor download URLs and UUIDs in them aren't secrets. Fill the **Disclosure surface** row with what remains, and credit redaction that worked (`<redacted>` in place of a webhook URL).
@@ -85,7 +105,7 @@ Extends SKILL.md Step 4, Secrets.
 A tool that never runs as root still has a trust boundary: other local accounts and the network. Check where it keeps credentials (SMTP passwords, API tokens, webhook URLs).
 
 - **Home directories aren't private on macOS.** On the Darwin 25 analysis host, home was `drwxr-x---+` with group `staff`, and every local account is in `staff`. `~/.config` was `0755`. A `0644` secrets file under `~` is therefore readable by every other local account. Confirm with `ls -ld ~ ~/.config` (read-only) and record the result as dated host evidence.
-- **Setting a mode on create doesn't enforce it.** `os.open(path, O_CREAT | O_TRUNC, 0o600)`, `umask 077; > file`, and `install -m 600` apply the mode only when they create the file. A file that already exists, or that the user wrote by hand from an example, keeps its old mode. Check two things:
+- **Setting a mode on create doesn't enforce it.** `os.open(path, O_CREAT | O_TRUNC, 0o600)` and `umask 077; > file` apply the mode only when they create the file. A file that already exists, or that the user wrote by hand from an example, keeps its old mode. Do not flag BSD/macOS `install -m 600` for this pattern; it applies the requested mode when replacing an existing destination. Check two things:
   - whether the loader checks `st_mode & 0o077` and the owner;
   - whether the docs or the success message claim "chmod 600" unconditionally. Check that claim against the code (SKILL.md Step 4, Secrets: "Verify the target's own security claims").
 - **Severity:** Low at the documented baseline, when the tool's own setup command creates the file. Give Medium as the alternate when the docs also allow hand-writing the file and the Mac may have more than one local account (`security.md`, Credential severity: world-readable file, narrow scope).

@@ -289,7 +289,7 @@ Before writing, check the reports directory (resolved as in item 9 below; also c
      mkdir -p "$reports"
      ```
 
-   - Never write reports into the target repo. The one exception is Monocle reviewing its own checkout, where option 2 applies.
+   - Never choose the target repo as a report destination automatically. The two exceptions are Monocle reviewing its own checkout, where option 2 applies, and an explicit `$MONOCLE_REPORTS_DIR` override. In either case, reports may be written inside a git repo only after the path is confirmed gitignored.
    - Reports contain security findings. If `$reports` is inside a git repository, make sure the path is gitignored before writing (`git -C "$reports" check-ignore -q "$reports/probe.md"`), and warn the user if it isn't. The Monocle repo's `.gitignore` already excludes `/reports/`.
 
    - Name the file `monocle-{target}-{YYYY-MM-DD-HHMM}.md`, using the same timestamp as the header (`date '+%Y-%m-%d-%H%M'`). `{target}` is the repo or file basename, lowercased, with anything outside `[a-z0-9._-]` replaced by `-`. Including the time keeps same-day re-runs from overwriting each other; if the name still exists, append `-2`, `-3`, and so on. Never overwrite an existing report.
