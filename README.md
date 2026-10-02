@@ -1,12 +1,12 @@
 # Monocle
 
-Monocle inspects scripts (and small local repos) and produces four audience-specific summaries (Executive, Security, Manager, Engineer) plus a 0–100 **Monocle Score**, where 100 means no issues.
+Monocle inspects scripts and small repos (local or on GitHub), plus diagnostic and support bundles, and produces four audience-specific summaries (Executive, Security, Manager, Engineer) plus a 0–100 **Monocle Score**, where 100 means no issues.
 
-Monocle is an [Agent Skill](https://agentskills.io) tuned for shell (sh/bash/zsh), Python, AppleScript, and Jamf/macOS automation. It pays particular attention to privilege elevation, silent failures, secrets, and environment assumptions.
+Monocle is an [Agent Skill](https://agentskills.io) tuned for shell (sh/bash/zsh), Python, AppleScript, Swift helpers, and Jamf/macOS automation. It pays particular attention to privilege elevation, silent failures, secrets, and environment assumptions.
 
 | View      | For                       | Answers |
 |-----------|---------------------------|---------|
-| Executive | Leadership, change boards | What it does, business risk, and a clear recommendation (3–6 bullets) |
+| Executive | Leadership, change boards | What it does, business risk, and a clear recommendation (up to 6 bullets) |
 | Security  | Security reviewers        | Severity-ranked findings, privilege map, secrets, network, and persistence |
 | Manager   | Team leads, service owners | Ownership, fragility, change risk, and prioritized action items |
 | Engineer  | Maintainers, reviewers    | Control flow, footguns, edge cases, and before/after refactors with line references |
@@ -21,9 +21,15 @@ monocle/
     ├── security.md
     ├── manager.md
     ├── engineer.md
+    ├── github-input.md         # Safe URL handling and fetch steps for GitHub targets
+    ├── large-targets.md        # Reading plan and coverage for oversized targets
     ├── patterns.md             # Quick-reference table of risky Jamf/macOS/Python patterns
-    ├── specialized-checks.md   # Bundle/log data scan and destructive-scope checks (loaded on trigger)
-    └── scoring-example.md      # Worked Monocle Score calculation
+    ├── semgrep.md              # Automated-scan command, rulesets, skip accounting, and triage
+    ├── specialized-checks.md   # Bundle intake and the conditional Step 4 checks, loaded on trigger
+    ├── prior-reports.md        # Using an earlier report on the same target
+    ├── scoring-example.md      # Worked Monocle Score calculation
+    ├── post-chat-refine.md     # Post-run prompt that folds a run's learnings back into the skill (on request)
+    └── binge-and-purge.md      # Maintenance pass that moves conditional content out of SKILL.md (on request)
 ```
 
 ## Install
@@ -69,6 +75,7 @@ Examples:
 - `monocle review ./postinstall`
 - `Give me the security view of this script` (attach the file)
 - `Summarize this repo for stakeholders: ~/Projects/jamf-scripts`
+- `monocle this ~/Downloads/support-bundle.zip — is it safe to attach to a GitHub issue?`
 - `$monocle just the engineer view of ./scripts/enroll.zsh` (Codex)
 
 All four views are produced by default. To get a subset, ask for it: "just the executive and manager views".
@@ -91,7 +98,9 @@ Or set the directory explicitly:
 export MONOCLE_REPORTS_DIR="$HOME/Documents/Monocle/reports"
 ```
 
-The reply gives the path, the Monocle Score, the overall risk and recommendation, and the findings table. If the directory can't be written, the report comes back inline instead.
+The reply gives the path, the Monocle Score, the overall risk and recommendation, the findings table, and any notable non-security issue. If the directory can't be written, the report comes back inline instead.
+
+The reply ends with an offer to run `post-chat-refine`, which folds the run's durable learnings back into `monocle/SKILL.md` and its references as generic guidance: target names, identifying details, and run-specific values are stripped, and a fingerprint check scans the added lines. Accepting edits the skill files in place, so review the diff before committing.
 
 ### Monocle Score
 

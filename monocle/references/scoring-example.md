@@ -6,14 +6,14 @@ A fully worked Monocle Score calculation for SKILL.md Step 5. Load it when a sco
 
 ---
 
-**Worked example.** Suppose a Jamf Self Service tool repairs, resets, or removes an office suite. It offers about 20 actions, including removing the EDR agent, and a Jamf parameter supplies an allowlist of actions. Under these rules:
+**Worked example.** Suppose a Jamf Self Service helpdesk toolkit repairs, resets, or removes managed apps. It offers about 15 actions, including removing the EDR agent, and a Jamf parameter supplies an allowlist of actions. Under these rules:
 
 - **Findings at the baseline.**
 
   | ID | Finding | Rating | Points |
   |---|---|---|---|
-  | S1 | Root installs packages from `/Users/Shared` with a name-only signature check | High (Code defect) | 20 |
-  | S2 | EDR removal and full-suite removal are offered when the allowlist parameter is blank | Low: an intended, documented, admin-gated capability with an unsafe default, so a secure-default gap (Rule 14) | 3 |
+  | S1 | Root installs packages from a user-writable staging directory with a name-only signature check | High (Code defect) | 20 |
+  | S2 | EDR removal and full app removal are offered when the allowlist parameter is blank | Low: an intended, documented, admin-gated capability with an unsafe default, so a secure-default gap (Rule 14) | 3 |
   | S3 | A tracked self-extracting wrapper | Info, because the documentation deploys the main script | 0 |
   | S4 | — | Medium | 8 |
   | S5 | Root runs `/usr/local/bin/dialog` | Low, assuming a root-owned `/usr/local/bin` | 3 |

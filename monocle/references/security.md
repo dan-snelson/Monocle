@@ -185,7 +185,7 @@ Why it's weak: no location, no evidence, no specific impact, and a generic fix.
   - `poplib.POP3_SSL` and `POP3.stls()`
   - `ftplib.FTP_TLS`
 
-  A network attacker can present any certificate and receive the login. `urllib.request` and `http.client` do verify by default. Fix: create `ctx = ssl.create_default_context()` once and pass `context=ctx` to each constructor and to `starttls()`/`stls()`. A server without STARTTLS raises an error, so these clients fail closed against a downgrade. The risk is interception, not stripping.
+  A network attacker can present any certificate and receive the login. `urllib.request` and `http.client` do verify by default. Fix: create `ctx = ssl.create_default_context()` once and pass `context=ctx` to each constructor and to `starttls()`/`stls()`. A server without STARTTLS raises an error, so these clients fail closed against a downgrade. The risk is interception, not stripping. A credential sent over an unverified channel is Medium when it is one user's narrow-scope credential; rate it higher with scope.
 - **Credit when present:** `subprocess` called with argument lists and never `shell=True`; values interpolated into an AppleScript string literal escaped for `\` and `"`; plist values passed through `xml.sax.saxutils.escape`.
 
 ### Swift / Objective-C (macOS helpers, daemons, GUI apps)
@@ -208,7 +208,7 @@ Why it's weak: no location, no evidence, no specific impact, and a generic fix.
 
 ### Jamf / macOS
 
-- **Params `$4`–`$11`** are visible to anyone with policy read access in Jamf Pro, and to every local user through the script's `argv` (SKILL.md Step 4, Secrets). Rate credentials there with **Credential severity** above.
+- **Params `$4`–`$11`** are visible to anyone with policy read access in Jamf Pro, and to every local user through the script's `argv` (`specialized-checks.md`, Jamf parameter secrets). Rate credentials there with **Credential severity** above.
 - **Bearer-token handling:** check that tokens are invalidated (`/api/v1/auth/invalidate-token`) and not written to disk.
 - **Extension Attributes** run as root on every recon. Keep them read-only; any write is a finding.
 - **`jamf` binary calls** (`jamf policy -event`, `jamf recon`, `jamf manage`) can chain into other root code. Note the dependency.
