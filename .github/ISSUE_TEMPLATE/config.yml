@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/dan-snelson/Monocle/security/policy
+    about: Do not file vulnerabilities as public issues. Follow SECURITY.md and email security@snelson.us.

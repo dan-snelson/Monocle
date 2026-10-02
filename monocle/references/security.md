@@ -179,6 +179,24 @@ Why it's weak: no location, no evidence, no specific impact, and a generic fix.
 - **Secrets in source,** in `argparse` defaults, or written to logs through `logging.debug(f"{token}")`.
 - **Python 2 `input()`** evaluates what it reads. Flag it if the script targets Python 2.
 - **Missing interpreter:** macOS no longer bundles `/usr/bin/python3` without the CLT. Code that falls back to an arbitrary `python3` on `PATH` could run a user-installed interpreter as root.
+- **The stdlib doesn't verify TLS for mail and FTP clients.** Called without `context=`, these use `ssl._create_stdlib_context()`, which is `CERT_NONE` with no hostname check (observed on 3.9.6 and 3.14.7):
+  - `smtplib.SMTP_SSL` and `SMTP.starttls()`
+  - `imaplib.IMAP4_SSL` and `IMAP4.starttls()`
+  - `poplib.POP3_SSL` and `POP3.stls()`
+  - `ftplib.FTP_TLS`
+
+  A network attacker can present any certificate and receive the login. `urllib.request` and `http.client` do verify by default. Fix: create `ctx = ssl.create_default_context()` once and pass `context=ctx` to each constructor and to `starttls()`/`stls()`. A server without STARTTLS raises an error, so these clients fail closed against a downgrade. The risk is interception, not stripping. A credential sent over an unverified channel is Medium when it is one user's narrow-scope credential; rate it higher with scope.
+- **Credit when present:** `subprocess` called with argument lists and never `shell=True`; values interpolated into an AppleScript string literal escaped for `\` and `"`; plist values passed through `xml.sax.saxutils.escape`.
+
+### Swift / Objective-C (macOS helpers, daemons, GUI apps)
+
+- **`Process` with `executableURL` and an `arguments` array** doesn't use a shell, so it's safe from injection. Credit it. `/bin/sh -c` or `/bin/zsh -c` with an interpolated string isn't.
+- **`Process` calling `/usr/sbin/chown` or `/bin/chmod`** without `-h` follows symlinks, exactly as in shell. Check the path's directory for user write access (SKILL.md Step 4, shared-directory trust).
+- **`Darwin.open` / `open(2)` flags:** a root writer without `O_NOFOLLOW` (and `O_CLOEXEC`) follows a planted symlink, and `O_CREAT` creates the target. Prefer `fstat` ownership checks plus `fchown`/`fchmod` on the descriptor over path-based calls.
+- **`FileManager`:** `copyItem` copies a symlink as a link, so a later `zip -r` dereferences it. `createFile(atPath:)` and `Data.write(to:)` on a fixed path in a shared directory follow symlinks. `.atomic` writes replace the file through a temporary file, which is safer for the target but still trusts the directory.
+- **Root reading user-controlled plists:** `NSDictionary(contentsOfFile:)` or `UserDefaults` on `~/Library/Preferences/…` inside a root daemon is untrusted input. Check what reaches a sink (process arguments, paths, URLs), and credit allowlist filtering when it's present.
+- **Privileged helpers:** SMAppService or `SMJobBless` daemons run as root. Check that the XPC listener validates the client's code-signing requirement (`setCodeSigningRequirement` or an audit-token check) before acting on requests, and that job files dropped into a shared directory are owner-checked.
+- **Pipe deadlock:** calling `readDataToEndOfFile()` only after `waitUntilExit()` hangs once the child fills the pipe buffer (about 64 KB). This is an Engineer footgun, not a security finding.
 
 ### AppleScript / osascript
 
@@ -190,7 +208,7 @@ Why it's weak: no location, no evidence, no specific impact, and a generic fix.
 
 ### Jamf / macOS
 
-- **Params `$4`–`$11`** are visible to anyone with policy read access in Jamf Pro, and to every local user through the script's `argv` (SKILL.md Step 4, Secrets). Rate credentials there with **Credential severity** above.
+- **Params `$4`–`$11`** are visible to anyone with policy read access in Jamf Pro, and to every local user through the script's `argv` (`specialized-checks.md`, Jamf parameter secrets). Rate credentials there with **Credential severity** above.
 - **Bearer-token handling:** check that tokens are invalidated (`/api/v1/auth/invalidate-token`) and not written to disk.
 - **Extension Attributes** run as root on every recon. Keep them read-only; any write is a finding.
 - **`jamf` binary calls** (`jamf policy -event`, `jamf recon`, `jamf manage`) can chain into other root code. Note the dependency.
