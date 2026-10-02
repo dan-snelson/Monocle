@@ -169,6 +169,8 @@ Targets the correct per-user bootstrap namespace, so the dialog actually appears
 - **Plists:** use `plistlib` rather than shelling out to `defaults read` and parsing text.
 - **Paths:** use `pathlib.Path` and `Path.home()`. Note that `home` is root's when the script runs as root, which is a common bug in Jamf-run Python.
 - **Mutable default args, globals as state, and `if __name__ == "__main__":` missing** (which makes the module untestable).
+- **Timeouts:** `smtplib`, `imaplib`, `ftplib`, `socket`, and `urllib.request.urlopen` wait forever unless given `timeout=`, because `socket.getdefaulttimeout()` is `None`. In a scheduled job that stalls the schedule (SKILL.md Step 4, Silent failures). Suggest one module constant, such as `TIMEOUT_S = 30`, and pass it to every network call.
+- **Secret parsing:** `value.strip().strip('"').strip("'")` and `getpass().strip()` silently change secrets that start or end with quotes or spaces, and the result shows up as a misleading auth failure. Strip only a matched pair of surrounding quotes, and don't strip `getpass` input.
 
 ### AppleScript / osascript
 

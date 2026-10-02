@@ -179,6 +179,14 @@ Why it's weak: no location, no evidence, no specific impact, and a generic fix.
 - **Secrets in source,** in `argparse` defaults, or written to logs through `logging.debug(f"{token}")`.
 - **Python 2 `input()`** evaluates what it reads. Flag it if the script targets Python 2.
 - **Missing interpreter:** macOS no longer bundles `/usr/bin/python3` without the CLT. Code that falls back to an arbitrary `python3` on `PATH` could run a user-installed interpreter as root.
+- **The stdlib doesn't verify TLS for mail and FTP clients.** Called without `context=`, these use `ssl._create_stdlib_context()`, which is `CERT_NONE` with no hostname check (observed on 3.9.6 and 3.14.7):
+  - `smtplib.SMTP_SSL` and `SMTP.starttls()`
+  - `imaplib.IMAP4_SSL` and `IMAP4.starttls()`
+  - `poplib.POP3_SSL` and `POP3.stls()`
+  - `ftplib.FTP_TLS`
+
+  A network attacker can present any certificate and receive the login. `urllib.request` and `http.client` do verify by default. Fix: create `ctx = ssl.create_default_context()` once and pass `context=ctx` to each constructor and to `starttls()`/`stls()`. A server without STARTTLS raises an error, so these clients fail closed against a downgrade. The risk is interception, not stripping.
+- **Credit when present:** `subprocess` called with argument lists and never `shell=True`; values interpolated into an AppleScript string literal escaped for `\` and `"`; plist values passed through `xml.sax.saxutils.escape`.
 
 ### Swift / Objective-C (macOS helpers, daemons, GUI apps)
 

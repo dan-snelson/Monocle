@@ -20,7 +20,10 @@ monocle/
     ├── executive.md
     ├── security.md
     ├── manager.md
-    └── engineer.md
+    ├── engineer.md
+    ├── patterns.md             # Quick-reference table of risky Jamf/macOS/Python patterns
+    ├── specialized-checks.md   # Bundle/log data scan and destructive-scope checks (loaded on trigger)
+    └── scoring-example.md      # Worked Monocle Score calculation
 ```
 
 ## Install
