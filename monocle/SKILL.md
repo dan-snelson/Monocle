@@ -1,6 +1,6 @@
 ---
 name: monocle
-description: Inspect scripts or small repos and produce four audience-specific summaries — Executive (business impact & risk), Security (threat surface & privileges), Manager (ownership & change risk), Engineer (logic & edge cases) — plus a 0–100 Monocle Score (100 = no issues). Trigger on “monocle this”, “monocle review”, “give me the executive/security/manager/engineer view”, “summarize this script for stakeholders”, or when the user pastes a GitHub URL or attaches a script/repo and asks for multi-audience analysis. Supports shell, Python, AppleScript, and common Jamf/macOS automation scripts.
+description: Inspect scripts or small repos and produce four audience-specific summaries — Executive (business impact & risk), Security (threat surface & privileges), Manager (ownership & change risk), Engineer (logic & edge cases) — plus a 0–100 Monocle Score (100 = no issues). Trigger on “monocle this”, “monocle review”, “give me the executive/security/manager/engineer view”, “summarize this script for stakeholders”, or when the user pastes a GitHub URL or attaches a script/repo and asks for multi-audience analysis. Also reviews diagnostic/support bundles (zips of logs, prefs, and metadata) and the code that generates them, for example "is this bundle safe to attach to a GitHub issue?". Supports shell, Python, AppleScript, Swift helpers, and common Jamf/macOS automation scripts.
 ---
 
 # Monocle
@@ -33,10 +33,11 @@ Use Monocle when the user:
 - Asks for "the executive / security / manager / engineer view" of code.
 - Asks to "summarize this script for stakeholders" or for "different audiences".
 - Pastes a GitHub URL, attaches a script, or points at a local directory and wants a multi-audience analysis.
+- Points at a diagnostic or support bundle and asks whether it is safe to share, or what security concerns it raises (Step 1 E).
 
 Produce **all four views** by default. Produce a subset only when the user explicitly asks for one ("just the security view", "exec and manager only"). When producing a subset, still do the full analysis in Steps 1–4. Findings from one view often change the conclusions of another.
 
-Do not use Monocle for a line-by-line code review, for fixing code, or for binary or compiled artifacts. For those, say that Monocle doesn't fit and suggest what does.
+Do not use Monocle for a line-by-line code review, for fixing code, or for binary or compiled artifacts. For those, say that Monocle doesn't fit and suggest what does. Archives of text data (logs, plists, JSON) are not binaries; handle them as Step 1 E.
 
 ---
 
@@ -98,6 +99,17 @@ Patterns: `github.com/{owner}/{repo}` or `github.com/{owner}/{repo}/tree/{ref}/{
 3. If it is a git repo, record `git rev-parse HEAD`, `git branch --show-current`, `git status --short` (uncommitted changes matter), and the output of `git log --format='%an' | sort | uniq -c | sort -rn | head` for the Manager view.
 4. Also run `git status --short --ignored` and compare `find` output with `git ls-files`. Local-only helpers (for example, a gitignored release script) exist only in this checkout. Semgrep skips untracked files that `.gitignore` excludes (it still scans untracked files that aren't ignored), so read the ignored ones manually and mark all local-only files "untracked, local only" in the header.
 
+### E. Diagnostic or support bundle
+
+A zip of logs, preference plists, receipts, and metadata that a tool generates for support, often with a request to attach it to a public GitHub issue. The core question is: **is this safe to post where it's going, and does the code that builds it create risk?**
+
+1. List it with `unzip -l` and read entries with `unzip -p "$zip" "$entry"`, which also works in read-only or plan mode. Print plists with `plutil -p -`. Extract into the scratch directory only for scanning. Never run anything inside the bundle.
+2. Find the generator: the app or script that builds the bundle (search its source for the bundle's file names). Ask one scope question if the user didn't say: bundle contents only, or bundle plus generator. In the second case the bundle is **evidence** and the generator is the **code under review**. Read any code that writes the sources the generator collects (shared log writers, permission setup) too, since the collector inherits their trust.
+3. Use bundle-relative paths as the location prefix (`metadata.txt:24`, `logs/app.log:993`), with line numbers from the extracted copy.
+4. Scan the data with the **Data scan** snippet in Step 4 and fill the fact sheet's **Disclosure surface** row.
+5. When the generator collects from host paths, record their real permissions on the analysis host (`ls -ld`, read-only) as observed host evidence, dated in Scope caveats.
+6. End the report with a verdict on **this specific artifact**: whether it is safe to post as is, and exactly which lines or files to redact first.
+
 ### Pasted code
 
 Treat inline code as C, with the location prefix `snippet`.
@@ -145,6 +157,8 @@ One script can blow the limit on its own (for example, a 9,000-line zsh file). D
 
 For long runs like this, post a one-line progress note between phases (fetch, read, analysis, writing), and at least every 5 or so tool calls within a phase. A 10,000-line review takes dozens of calls, and long silent stretches make users think the work has stalled. The manual reading in Step 4 is where silence builds up most, so keep up the notes there too.
 
+**Read-only or plan mode.** If the session doesn't allow writes yet, do Steps 1–4 with streaming reads only (`cat`, `sed -n`, `unzip -p`, `git show`, `ls -ld`). Defer scratch extraction, the semgrep run, isolated tool checks (Rule 4), and the report write until execution is allowed, and list them as pending steps in the plan.
+
 ---
 
 ## Step 3 — Build a fact sheet
@@ -163,7 +177,8 @@ Capture:
 | Self-provenance | If the script copies itself (`${0:A}`, `$0`, `__file__`) into a persistent location, where can `$0` live? Trace every deploy path. A launch from a shared or user-writable path makes the persistent copy attacker-controlled |
 | Execution context | root, console user, a specific service account, or unknown |
 | Early exits & gates | Cache shortcuts, version checks, and mode checks that end the run early. Note what still runs before them and what they skip |
-| Shared-path trust | Every path in `/tmp`, `/var/tmp`, or `/Users/Shared` that root reads, writes, executes, or `chown`s, and who owns each one after the run |
+| Shared-path trust | Every path in `/tmp`, `/var/tmp`, `/Users/Shared`, or an app-owned directory that non-root users can write, that root reads, writes, executes, or `chown`s, and who owns each one after the run |
+| Disclosure surface | For bundles, reports, or logs the code emits for others to read: identity (username, group list, home paths), software inventory, org configuration and schedules, other users' data in shared logs, the redaction model (allowlist or denylist), and whether DEBUG lines reach the file regardless of mode |
 | Inputs | CLI args, Jamf `$4`–`$11`, env vars, config files, plists, network responses |
 | Outputs & side effects | Files written or deleted, prefs changed, services loaded, users modified, network sent |
 | Privileged operations | Each with a `file:line` reference |
@@ -183,7 +198,7 @@ Mark each fact **observed** (seen in code, with `file:line`) or **inferred** (re
 
 ## Step 4 — Check the high-risk areas
 
-For shell, Python, AppleScript, and Jamf/macOS code, explicitly check the five areas below. Record hits in the fact sheet with `file:line`.
+For shell, Python, AppleScript, Swift, and Jamf/macOS code, explicitly check the areas below. Record hits in the fact sheet with `file:line`.
 
 ### Automated scan (when `semgrep` is available)
 
@@ -198,15 +213,32 @@ jq -r '.errors[] | "\(.path // "-")\t\(.message[0:120])"' "$scratch/semgrep.json
 jq -r '.paths.skipped[]? | "\(.reason)\t\(.path)"' "$scratch/semgrep.json"
 ```
 
-- **Rulesets.** Add a language pack when the target uses that language, for example `p/python`, `p/javascript`, or `p/dockerfile`. `p/bash` doesn't exist and returns an HTTP 404 that fails the whole run. Always pass `--config` explicitly so a config file shipped in the target repo is never used.
+- **Rulesets.** Add a language pack when the target uses that language, for example `p/python`, `p/javascript`, `p/swift`, or `p/dockerfile`. For a bundle (Step 1 E), run `p/secrets` over the extracted data too. `p/bash` doesn't exist and returns an HTTP 404 that fails the whole run. Always pass `--config` explicitly so a config file shipped in the target repo is never used.
 - **Registry rules need network access.** If the download fails, note that in the header and carry on with the manual checks.
 - **Treat the scan as a supplement, not coverage.** Semgrep has no zsh parser and only partial bash rules. It can report **0 findings** on a large zsh script that has a symlink privilege escalation, a leaked token, and forgeable caches. Zero findings never means clean, so Step 4 stays mandatory.
 - **Check what the scan skipped.** In a git repo, Semgrep scans tracked files plus untracked files that `.gitignore` doesn't exclude. It also skips files over 1 MB and honors a `.semgrepignore` in the target. List any exclusions and parse errors (`.errors[]`) under Scope caveats.
-  - `--verbose` populates `.paths.skipped` with each size skip (`exceeded_size_limit`) and `.semgrepignore` match (`semgrepignore_patterns_match`); without it the array is empty. As a cross-check, the `semgrep.err` summary reports "Files larger than 1.0 MB: N", and `find "$target" -path '*/.git' -prune -o -type f -size +1000k -print` names them.
+  - `--verbose` populates `.paths.skipped` with each size skip (`exceeded_size_limit`) and `.semgrepignore` match (`semgrepignore_patterns_match`); without it the array is empty. As a cross-check, the `semgrep.err` summary reports "Files larger than 1.0 MB: N", and `find "$target" -path '*/.git' -prune -o -type f -size +1000k -print` names them. When a skipped file matters (a large script or log), rescan it alone with `--max-target-bytes 0` and report that run separately.
   - Gitignored files don't appear in `.paths.skipped`, even with `--verbose`. Take them from `git status --short --ignored` (Step 1 D).
   - Parse errors from `p/ci` on the embedded bash in GitHub Actions `run:` blocks are common and are the scanner's limitation, not a defect in the target. Count them and move on.
 - **Run it in the background.** A full-repo scan takes minutes. Start it before mapping the structure, and triage its results when it finishes.
 - **Triage every result.** Confirm each one in the code before it becomes a finding. Cite confirmed results in the Security view with the rule ID, for example `(semgrep: bash.curl.security.curl-pipe-bash)`. Drop false positives silently, but count them in the header.
+
+### Data scan (bundles and logs)
+
+For Step 1 E inputs, and for any shipped log the code writes, pattern-scan the text. It reads straight from the archive, so it works in read-only mode:
+
+```bash
+d() { unzip -p "$zip" '*.log' '*.txt' '*.json' '*.jsonl' '*.plist' 2>/dev/null; }
+d | grep -inE 'bearer|authorization:|token|secret|passw(or)?d|api[_-]?key|hooks\.slack\.com|webhook\.office\.com|logic\.azure\.com' | cut -c1-200 | head -40
+d | grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' | sort | uniq -c | head
+d | grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b|\b([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\b' | sort | uniq -c | head
+d | grep -inE 'serial|hostname|computername|udid|IOPlatform' | cut -c1-200 | head
+d | grep -oE '/Users/[^/ ":]+' | sort | uniq -c
+d | grep -oE 'https?://[^ "<>]+\?[^ "<>]+' | sort -u | head -20   # query strings can carry tokens
+d | grep -oE '\[(DEBUG|INFO|NOTICE|WARNING|ERROR|FAULT)\]' | sort | uniq -c
+```
+
+Many hits are label or product names ("1password", "gitcredentialmanager"), so triage each one. Public vendor download URLs and UUIDs in them aren't secrets. Fill the **Disclosure surface** row with what remains, and credit redaction that worked (`<redacted>` in place of a webhook URL).
 
 ### Privilege elevation
 
@@ -219,17 +251,29 @@ jq -r '.paths.skipped[]? | "\(.reason)\t\(.path)"' "$scratch/semgrep.json"
 - **Triggered scripts must meet the main script's standard.** When the main script hardens itself (a strict `PATH`, absolute binary paths, trusted-path checks), check the scripts it runs as root (`jamf policy -event` targets, external checks, EAs) for the same controls. Re-adding `/usr/local/bin` to `PATH` there, or calling `/usr/local/bin/<vendor-tool>`, undoes the hardening for code that runs on the same schedule.
 - **Installer payload location.** A pkg that installs into `/usr/local/bin` and has `postinstall` run the file from there executes a path that may be user-owned on Intel Homebrew Macs. A trusted-path check before self-copy protects persistence, but not the immediate root run.
 
-### Shared-directory trust (`/tmp`, `/var/tmp`, `/Users/Shared`)
+### Shared-directory trust (`/tmp`, `/var/tmp`, `/Users/Shared`, app-owned shared directories)
 
 The sticky bit on these directories stops users from deleting *other people's* files. It does not stop them from creating a name first, or from replacing files they own. Check for each of these:
+
+- **App-owned directories that users can write.** A vendor directory such as `/Library/Application Support/<vendor>/logs` set to `root:staff 0775` or `root:admin 0775` so the GUI can share a log with the root daemon is as exposed as `/tmp`, and worse without the sticky bit. `staff` is every local account, and a group-writable directory without `+t` lets any member unlink root-owned files and put a symlink in their place. Root then running `chown`/`chmod` without `-h`, or `open()` without `O_NOFOLLOW`, on a file there is local privilege escalation, often at every daemon start. Read the code that sets the mode, and confirm the live mode on the analysis host with `ls -ld` (read-only; record it as dated host evidence). Recommend a root-only log for the daemon, `1775` if sharing is unavoidable, and `lstat` plus owner checks with `fchown`/`fchmod` on an `O_NOFOLLOW` descriptor.
 
 - **Root writes to a fixed name.** `>`, `: >`, `curl -o`, `cp`, `mkdir -p`, `chmod`, and `chown` (without `-h`) all follow symlinks. A user who plants a symlink first gets root to overwrite, or change the mode or owner of, an arbitrary file. `mktemp` names are safe; fixed names are not.
 - **Root `chown`s a file to the console user.** Once the user owns a file in a sticky directory, they can delete it and put a symlink in its place. The next run's `chown`/`chmod` then hands the user ownership of the symlink's target. That is local privilege escalation. Look at write-then-`chown` helpers and at "prepare file for user" functions, including replay or cache paths that `chown` without writing.
 - **Root trusts a file it didn't create.** A cache, report, trigger file, or downloaded feed that is validated only by age or syntax can be forged by a user who creates it first. Examples: compliance results uploaded to a SIEM, and OS-update feeds that decide compliance. Check whether ownership (`stat -f '%Su:%Sg'`) and `[[ -L ]]` are verified.
 - **Write, then execute.** Root writes a script to a fixed shared path (self-extracting wrappers, `base64 -d > /var/tmp/x.zsh; zsh /var/tmp/x.zsh`) and then runs it. A user who pre-created the file keeps ownership after root's `>` truncates it, so they can rewrite it in the gap. The gap is wider than it looks: any slow discovery (`mdfind`, `system_profiler`) before the script copies itself extends it. The wrapper generator is often a separate helper script, so read the text it generates.
 - **Glob cleanup of shared paths.** `rm -f /var/tmp/prefix_*` in a quit function deletes the files of concurrent instances too (a Silent policy run alongside a Self Service run). It's not a security issue, but it's an Engineer footgun.
-- **High-value targets.** When you find a symlink primitive, name a concrete target the code itself creates. The best example is a script that a root LaunchDaemon runs, because taking ownership of it gives persistent root. Record the chain as observed code path plus inferred exploitability.
+- **High-value targets.** When you find a symlink primitive, name a concrete target the code itself creates. The best example is a script that a root LaunchDaemon runs, because taking ownership of it gives persistent root. Check the mode the primitive sets: a symlinked `chmod 0664` strips the execute bit, so a target that root executes directly becomes a denial of service, not code execution, when the attacker can't restore `+x`. In that case name a target root reads or sources instead (a config file, a shell startup file), and say which kind it is. Record the chain as observed code path plus inferred exploitability.
 - **The fix pattern** to recommend: use a root-owned `0755` runtime directory, or `mktemp -d` per run; write atomically (`mktemp` in the same directory, then `mv -f`); never `chown` a root-written input to the user; and check ownership before trusting any cache.
+
+### Collectors and archivers
+
+Code that gathers files into a bundle, report, or upload inherits the trust of every directory it reads.
+
+- **Symlinks pull in other files.** `FileManager.copyItem`, `cp -R`, and `ditto` copy a symlink as a link, but `zip -r` without `-y` stores the link's *target*. A user who can write to a collected directory plants `x.log -> /Users/<victim>/.ssh/id_ed25519`, and the victim's next bundle includes the key. The finding is cross-user exfiltration, made worse when the bundle goes to a public issue. Check this tool behavior in isolation in the scratch directory (Rule 4), then cite the observed result.
+- **Fix pattern:** skip anything that isn't a regular file (`lstat`, `URLResourceValues.isSymbolicLink`/`isRegularFile`, `find -type f`), require the expected owner for shared sources, and pass `zip -y` as a second layer.
+- **Denylist redaction** (a fixed set of keys replaced with `<redacted>`) leaks any secret-bearing key added later, and logs or crash reports copied byte for byte are never scrubbed. Rate it Low when nothing leaks today. Recommend an allowlist export, a scrubber for webhook hosts, `Authorization`/`Bearer`, URL query strings, and `/Users/<name>`, plus a test that fails when a new key is in neither list.
+- **Public-posting exposure.** A bundle that the maintainers ask users to attach to public issues and that carries identity, group lists, inventory, or org schedules is a Low finding (Origin: Code + Deployment) when no credential is present. Recommend a "prepare for public posting" mode and a private upload path.
+- **Disclosure.** When a High or Critical finding sits in third-party shipping code whose support process is public, add a Cross-cutting note recommending private vulnerability reporting before any public issue.
 
 ### Silent failures
 
@@ -313,6 +357,7 @@ Before writing, check the reports directory (resolved as in item 9 below; also c
    - The pass 2 regex skips references whose file name contains a space (for example, `checks/Vendor Agent Status.bash:8`). List those separately with ``grep -oE '`[^`]* [^`]*:[0-9]+(–[0-9]+)?`' "$reports/…md"`` and check them too.
    - Fix wrong lines with `grep -nF 'snippet' file`. If a line can't be pinned down, cite the function name instead.
    - Shorthand such as `` `:120` `` refers to the last file named in the same bullet. Never mix files in one parenthetical with shorthand (`` (`README.md:40`, `:120`) `` reads as README line 120). Write the full `file:line` whenever the file changes. Pass 2 lists shorthand as bare `` `:NNN` `` matches; check that each one has an unambiguous file.
+   - Any file name in the bullet counts as "last file named", including data files mentioned in prose (`` `metadata.txt` truncates hashes (`:130`) `` reads as `metadata.txt` line 130). Roll-up and credit bullets drift most here, so give them full paths.
 8. **Date- and time-stamp the report.**
    - Get the timestamp from `date '+%Y-%m-%d %H:%M %Z'` (or the session's current date and time when no shell is available) and put it in the header's **Date** field.
    - It records when the analysis ran, not when the code was committed; the SHA or ref covers that.
@@ -532,6 +577,12 @@ Use this table to spot common patterns quickly. Each hit belongs in the fact she
 | `curl … \| bash` / `sh -c "$(curl …)"` | Remote code execution as root; integrity depends on the remote host | Security, Executive |
 | `curl -k` / `--insecure` | TLS verification disabled | Security |
 | `/tmp/fixed-name` files | Predictable path; symlink attacks as root | Security |
+| `/Library/Application Support/<vendor>/…` set `root:staff 0775` (no sticky bit), then root `chown`/`chmod` without `-h` at daemon start | Any local user swaps the shared file for a symlink; the next start hands them the target (LPE) | Security, Executive |
+| Root log writer calls `open()` with `O_CREAT` and `O_APPEND` but no `O_NOFOLLOW` on a user-writable path | Root appends to, or creates, any file the symlink names | Security |
+| Bundle generator: `copyItem`/`cp -R` from a user-writable directory, then `zip -r` without `-y` | Planted symlinks pull the generating user's private files into the archive | Security |
+| Redaction via a fixed key denylist; logs copied unscrubbed | New secret-bearing keys and log lines leak by default | Security, Engineer |
+| DEBUG always written to the shipped log, whatever the debug setting | Larger disclosure surface in every support bundle | Security, Engineer |
+| Bundle metadata includes `NSUserName()` / `id -Gn` and is meant for public issues | Identity and privilege-group tiers published | Security |
 | Root writes `/var/tmp/fixed`, then `chown "$loggedInUser"` it | The user can swap it for a symlink; the next `chown` gives them any root file (LPE) | Security, Executive |
 | Root trusts a `/var/tmp` cache or report checked only by mtime or syntax | Users can forge results before upload or scoring | Security, Executive |
 | `base64 -d > /var/tmp/x.zsh; zsh /var/tmp/x.zsh` (self-extracting wrapper) | Race between write and execute gives root | Security |
