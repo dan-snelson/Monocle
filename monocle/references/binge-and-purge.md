@@ -1,5 +1,13 @@
 # Binge and Purge
 
+## Contents
+- Purpose
+- Budget
+- Phase 1: Analyze and propose (no edits)
+- Phase 2: Implement (after approval)
+- Phase 3: Verify
+- Guardrails
+
 ## Purpose
 
 A maintenance pass that keeps `monocle/SKILL.md` lean. `post-chat-refine.md` "binges": each run folds new lessons into the skill, and SKILL.md grows. This file "purges": it moves conditional content out of SKILL.md into `references/`, without changing meaning, until the file fits comfortably in a single Read.

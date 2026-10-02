@@ -1,5 +1,19 @@
 # Engineer View
 
+## Contents
+- Purpose
+- Structure and tone
+- Key questions the summary must answer
+- Prioritization
+- Good vs weak examples
+  - Weak
+  - Good
+- Language notes
+  - Shell (sh / bash / zsh)
+  - Python
+  - AppleScript / osascript
+  - Jamf / macOS
+
 ## Purpose
 
 The Engineer view helps someone who will maintain, review, or extend the code:

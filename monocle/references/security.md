@@ -1,5 +1,23 @@
 # Security View
 
+## Contents
+- Purpose
+- Structure and tone
+- Key questions the summary must answer
+- Severity scale
+  - Credential severity
+- Good vs weak examples
+  - Weak finding
+  - Good finding
+  - Weak secrets inventory
+  - Good secrets inventory
+- Language notes
+  - Shell (sh / bash / zsh)
+  - Python
+  - Swift / Objective-C (macOS helpers, daemons, GUI apps)
+  - AppleScript / osascript
+  - Jamf / macOS
+
 ## Purpose
 
 The Security view gives a security or risk reviewer:
