@@ -1,4 +1,4 @@
-# Specialized Checks
+# ⚙️ Specialized Checks
 
 ## Contents
 - Purpose

@@ -1,4 +1,4 @@
-# Manager View
+# 📋 Manager View
 
 ## Contents
 - Purpose

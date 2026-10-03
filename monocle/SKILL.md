@@ -3,16 +3,16 @@ name: monocle
 description: Inspect scripts or small repos and produce four audience-specific summaries — Executive (business impact & risk), Security (threat surface & privileges), Manager (ownership & change risk), Engineer (logic & edge cases) — plus a 0–100 Monocle Score (100 = no issues). Trigger on “monocle this”, “monocle review”, “give me the executive/security/manager/engineer view”, “summarize this script for stakeholders”, or when the user pastes a GitHub URL or attaches a script/repo and asks for multi-audience analysis. Also reviews diagnostic/support bundles (zips of logs, prefs, and metadata) and the code that generates them, for example "is this bundle safe to attach to a GitHub issue?". Supports shell, Python, AppleScript, Swift helpers, and common Jamf/macOS automation scripts.
 ---
 
-# Monocle
+# 🔍 Monocle
 
 Monocle reads a script or small repo once and writes four summaries of it. Each summary is for a different reader:
 
 | View      | Reader                     | Core question                                          |
 |-----------|----------------------------|--------------------------------------------------------|
-| Executive | Leadership, change board   | Should we run this, and what does it cost us if it goes wrong? |
-| Security  | Security / risk reviewers  | What can this touch, with what privileges, and how can it be abused? |
-| Manager   | Team lead, service owner   | Who owns this, how fragile is it, and what must happen next? |
-| Engineer  | Maintainer, reviewer       | How does it actually work, where does it break, and how do we fix it? |
+| 👔 Executive | Leadership, change board   | Should we run this, and what does it cost us if it goes wrong? |
+| 🔒 Security  | Security / risk reviewers  | What can this touch, with what privileges, and how can it be abused? |
+| 📋 Manager   | Team lead, service owner   | Who owns this, how fragile is it, and what must happen next? |
+| 🛠️ Engineer  | Maintainer, reviewer       | How does it actually work, where does it break, and how do we fix it? |
 
 Every report also carries a **Monocle Score** from 0 to 100, where 100 means no issues were found. It rates the code as deployed per its documentation, not the tool's intended power (Rule 14). Step 5 defines how to compute it.
 
@@ -37,7 +37,7 @@ More reference files are loaded by step or by trigger, not by view:
 
 ---
 
-## When to use
+## 📌 When to use
 
 Use Monocle when the user:
 
@@ -53,7 +53,7 @@ Do not use Monocle for a line-by-line code review, for fixing code, or for binar
 
 ---
 
-## Step 1 — Determine the input type
+## 1️⃣ Step 1 — Determine the input type
 
 Classify the input before reading anything else. Name the type in the report header.
 
@@ -88,7 +88,7 @@ If the input is ambiguous (for example, a bare repo name), ask one clarifying qu
 
 ---
 
-## Step 2 — Scope the corpus
+## 2️⃣ Step 2 — Scope the corpus
 
 Monocle targets **single scripts and small repos**: about 30 source files or about 5,000 lines of code.
 
@@ -120,7 +120,7 @@ When the corpus is over the limits above, or one file is too large to read top t
 
 ---
 
-## Step 3 — Build a fact sheet
+## 3️⃣ Step 3 — Build a fact sheet
 
 Before writing any view, build an internal fact sheet. Don't show it to the user unless they ask. Every view draws from it, which keeps the four views consistent with each other.
 
@@ -155,7 +155,7 @@ Mark each fact **observed** (seen in code, with `file:line`) or **inferred** (re
 
 ---
 
-## Step 4 — Check the high-risk areas
+## 4️⃣ Step 4 — Check the high-risk areas
 
 For shell, Python, AppleScript, Swift, and Jamf/macOS code, explicitly check the areas below. Record hits in the fact sheet with `file:line`.
 
@@ -243,7 +243,7 @@ Group-writable app-owned directories, and choosing a high-value target once you 
 
 ---
 
-## Step 5 — Write the views
+## 5️⃣ Step 5 — Write the views
 
 Before writing, check the reports directory (resolved as in item 9 below; also check `$HOME/monocle-reports` when it differs, since earlier versions saved there) for an existing Monocle report on the same target. If one exists, load `references/prior-reports.md` and follow it: a prior report is a checklist and draft aid, never current evidence.
 
@@ -266,7 +266,7 @@ Before writing, check the reports directory (resolved as in item 9 below; also c
    - Any file name in the bullet counts as "last file named", including data files mentioned in prose (`` `metadata.txt` truncates hashes (`:130`) `` reads as `metadata.txt` line 130). Roll-up and credit bullets drift most here, so give them full paths.
    - **Check refactor snippets as well as citations.** Test each "after" snippet against every platform variant the target supports: Apple silicon and Intel Homebrew prefixes, zsh and bash, and the oldest supported interpreter as well as the current one. Snippets that derive paths or parse tool output are wrong most often. For example, `Path(brew).resolve()` gives the wrong prefix on Intel.
 8. **Date- and time-stamp the report.**
-   - Get the timestamp from `date '+%Y-%m-%d %H:%M %Z'` (or the session's current date and time when no shell is available) and put it in the header's **Date** field.
+   - Get the timestamp from `date '+%Y-%m-%d %H:%M %Z'` (or the session's current date and time when no shell is available) and put it in the **Date** row of the header table.
    - It records when the analysis ran, not when the code was committed; the SHA or ref covers that.
    - Never guess it from commit history or training data.
 9. **Write the report to the reports directory.**
@@ -298,7 +298,7 @@ Before writing, check the reports directory (resolved as in item 9 below; also c
    - In the reply, give the report's absolute path, the Monocle Score, the overall risk and recommendation, the findings table, and any notable non-security issue. Don't paste the full report unless the user asks.
 10. **Offer post-chat-refine.** End the reply with one line offering to run `post-chat-refine`, which folds this run's durable learnings back into the skill. If the user accepts, load `references/post-chat-refine.md` and follow it. Otherwise do nothing, and don't offer again in the same session once declined. The offer goes in the reply only, never in the report.
 
-### Monocle Score
+### 📈 Monocle Score
 
 The Monocle Score summarizes the whole report in one number from 0 to 100. A score of 100 means no issues were found. Use it to compare runs, releases, and targets. Derive it from the findings only: never adjust it by judgment, and never soften or inflate a finding to move it.
 
@@ -308,11 +308,11 @@ The score measures what the **code** gets wrong, assuming the Mac Admin deploys 
 
 | Issue | Deduction |
 |---|---|
-| Critical Security finding | 40 |
-| High Security finding | 20 |
-| Medium Security finding | 8 |
-| Low Security finding | 3 |
-| Info Security finding | 0 (an observation, not an issue) |
+| 🔴 Critical Security finding | 40 |
+| 🟠 High Security finding | 20 |
+| 🟡 Medium Security finding | 8 |
+| 🔵 Low Security finding | 3 |
+| ⚪ Info Security finding | 0 (an observation, not an issue) |
 | Non-security issue | 2 each, 20 at most in total |
 
 - **Security findings** are the rows of the Security view's findings table. A single "Low / Info" roll-up bullet counts as one Low if it names a real gap. It counts as zero if it only credits good practice.
@@ -325,10 +325,10 @@ The score measures what the **code** gets wrong, assuming the Mac Admin deploys 
 
 | Highest finding | Score range | Possible bands |
 |---|---|---|
-| Critical | 0–39 | Critical, Poor |
-| High | 25–69 | Poor, Fair |
-| Medium | 50–89 | Fair, Good |
-| Low, Info, or none | 70–100 | Good, Excellent |
+| 🔴 Critical | 0–39 | 🔴 Critical, 🟠 Poor |
+| 🟠 High | 25–69 | 🟠 Poor, 🟡 Fair |
+| 🟡 Medium | 50–89 | 🟡 Fair, 🔵 Good |
+| 🔵 Low, ⚪ Info, or none | 70–100 | 🔵 Good, 🟢 Excellent |
 
 A raw score above the range is **capped** at its top; a raw score below it is **floored** at its bottom. Say which one applied in the Total line.
 
@@ -336,16 +336,16 @@ A raw score above the range is **capped** at its top; a raw score below it is **
 
 | Score | Band |
 |---|---|
-| 90–100 | Excellent |
-| 70–89 | Good |
-| 50–69 | Fair |
-| 25–49 | Poor |
-| 0–24 | Critical |
+| 90–100 | 🟢 Excellent |
+| 70–89 | 🔵 Good |
+| 50–69 | 🟡 Fair |
+| 25–49 | 🟠 Poor |
+| 0–24 | 🔴 Critical |
 
 **Documented-deployment baseline.** When a finding's severity depends on deployment (Rule 11), compute the score both ways and give both.
 
 - **Headline:** the documented-deployment baseline. Assume the safest configuration that the target's documentation describes *and* the code supports: the documented parameter allowlist is set, the documented deploy file is used, the documented secrets delivery is used. Platform defaults count too (for example, root-owned `/usr/local/bin` on Apple silicon). Each assumption goes in the Operator baseline list.
-- **Alternate:** the misconfigured case, for example "39/100 (Poor), or 25/100 (Poor) if any Self Service policy leaves the allowlist parameter blank".
+- **Alternate:** the misconfigured case, for example "39/100 (🟠 Poor), or 25/100 (🟠 Poor) if any Self Service policy leaves the allowlist parameter blank".
 - **No safe path, no baseline credit.** If the code offers no safe way to deploy (a secret the code accepts only through `$4`–`$11`, a gate that doesn't exist), the exposure is part of the baseline and counts in the headline. The admin can't be smarter than a tool that gives them no choice.
 - **Undocumented controls get no credit.** If the only safe configuration is one the documentation never mentions, score the headline at the unsafe rating and give the safe one as the alternate. Missing documentation is itself a Code issue.
 - Rating stays tied to what the code allows (Rule 11); the baseline only chooses which of the two numbers leads.
@@ -354,18 +354,26 @@ A raw score above the range is **capped** at its top; a raw score below it is **
 
 **Worked example.** `references/scoring-example.md` scores a Jamf Self Service helpdesk toolkit step by step, covering a headline and an alternate, a band floor, and a Rule 14 secure-default gap. Load it when the score depends on deployment or a clamp applies.
 
-### Output template
+### 📝 Output template
 
 Use this layout for the full report. Keep all headings, even when a section is short.
 
 ```markdown
 # Monocle Report: {target name}
+**Monocle Score:** {n}/100 ({band emoji} {band}) at the documented-deployment baseline — {basis, e.g. "1 High, 1 Medium, 3 Low, 9 non-security"}{, or {n2}/100 ({band2 emoji} {band2}) if {admin condition is not met}}{; up/down from {prior} at {prior ref}}
 
-**Date:** {YYYY-MM-DD HH:MM TZ}  ·  **Target:** {URL or path}  ·  **Ref:** {SHA / branch / "attached file"}  ·  **Language(s):** {…}
-**Files analyzed:** {n} — {list, or top 10 + "and N more"}
-**Automated scan:** {semgrep {version} — {rulesets} — {n} results ({m} confirmed), {e} parse errors, {k} files skipped (size / .semgrepignore / gitignored) | "semgrep not installed" | "registry unreachable"}
-**Scope caveats:** {skipped files, unfetchable deps, assumptions — or "None"}
-**Monocle Score:** {n}/100 ({band}) at the documented-deployment baseline — {basis, e.g. "1 High, 1 Medium, 3 Low, 9 non-security"}{, or {n2}/100 ({band2}) if {admin condition is not met}}{; up/down from {prior} at {prior ref}}
+| Field | Value |
+|---|---|
+| **Date** | {YYYY-MM-DD HH:MM TZ} |
+| **Target** | {URL or path} ({input type}) |
+| **Ref** | {SHA / branch / "attached file"} |
+| **Language(s)** | {…} |
+| **Files analyzed** | {n} — {list, or top 10 + "and N more"} |
+| **Automated scan** | {semgrep {version} — {rulesets} — {n} results ({m} confirmed), {e} parse errors, {k} files skipped (size / .semgrepignore / gitignored); or "semgrep not installed"; or "registry unreachable"} |
+| **Scope caveats** | {"None", or "See below"} |
+
+**Scope caveats:**
+- **{Short label}.** {One caveat per bullet: skipped files, coverage, unfetchable deps, assumptions, isolated checks, side effects. Nest bullets for line ranges and lists.}
 
 ---
 
@@ -373,28 +381,36 @@ Use this layout for the full report. Keep all headings, even when a section is s
 
 | Source | IDs | Count | Each | Deduction |
 |---|---|---|---|---|
-| Critical | {S…} | {n} | 40 | {n×40} |
-| High | {S…} | {n} | 20 | {n×20} |
-| Medium | {S…} | {n} | 8 | {n×8} |
-| Low | {S…} | {n} | 3 | {n×3} |
-| Info | {S…} | {n} | 0 | 0 |
+| 🔴 Critical | {S…} | {n} | 40 | {n×40} |
+| 🟠 High | {S…} | {n} | 20 | {n×20} |
+| 🟡 Medium | {S…} | {n} | 8 | {n×8} |
+| 🔵 Low | {S…} | {n} | 3 | {n×3} |
+| ⚪ Info | {S…} | {n} | 0 | 0 |
 | Non-security | {short names} | {n} | 2 (max 20) | {min(n×2, 20)} |
 | Not scored | {maintainer-tooling issues, or "—"} | {n} | 0 | 0 |
 
-**Total:** 100 − {deductions} = {raw}{; capped at {cap} by the {severity} range | ; floored at {floor} by the {severity} range} → **{n}/100 ({band})**
+**Total:** 100 − {deductions} = {raw}{; capped at {cap} by the {severity} range | ; floored at {floor} by the {severity} range} → **{n}/100 ({band emoji} {band})**
 {If conditional: one line with the alternate total, its clamp, and the condition that produces it.}
-{If a prior report covers an earlier ref: **Score change:** {±n} from {prior} at `{prior ref}` — prior findings closed, persisting, and new, with each new finding marked as introduced or previously missed.}
+{If a prior report covers an earlier ref: **Score change:** {±n} from {prior} at `{prior ref}`, followed by nested bullets labeled **Closed:**, **Persisting:**, and **New:**, with each new finding marked as introduced or previously missed.}
 
 **Operator baseline:** {What the headline assumes the Mac Admin has done, one bullet per condition, each naming the finding it flips, e.g. "Every interactive policy sets the allowlist parameter and excludes EDR removal (S2 → High if not)". Or "None — the score doesn't depend on deployment."}
+
+---
 
 ## Executive View
 {per references/executive.md}
 
+---
+
 ## Security View
 {per references/security.md}
 
+---
+
 ## Manager View
 {per references/manager.md}
+
+---
 
 ## Engineer View
 {per references/engineer.md}
@@ -405,11 +421,17 @@ Use this layout for the full report. Keep all headings, even when a section is s
 {Optional. Only for issues that span views or need a decision. Omit the section if there is nothing to add.}
 ```
 
+Header layout:
+
+- The score line follows the title directly, so it is always the report's second line.
+- Each header table cell holds one line. Don't use HTML such as `<br>`, and don't put a `|` inside a cell.
+- Anything with several parts goes in the **Scope caveats** bullet list under the table: coverage line ranges, read-directly vs pattern-scanned file lists, isolated-check evidence, side effects. Start each bullet with a bold label. When the row says "None", omit the list.
+
 For a subset request, keep the header block and the Monocle Score section, and include only the requested view sections. Compute the score from the full analysis (Steps 1–4 always run), not from the views you wrote.
 
 ---
 
-## Rules
+## 📌 Rules
 
 1. **Cite concrete observations.** Every finding names the command, function, variable, or path and gives `file:line` when possible. "Runs `rm -rf "$dir"` at `cleanup.sh:42` with `$dir` unset if `$4` is empty" is useful. "Be careful with deletion" is not.
 2. **Never invent line numbers.** If you can't see line numbers, for example when content came from a paste that may be truncated, cite a function name or quote a short snippet instead.
@@ -424,7 +446,7 @@ For a subset request, keep the header block and the Monocle Score section, and i
 6. **Redact secrets.** Show at most the first 4 characters. Never repeat a full credential.
 7. **Don't pad.** If a view has nothing significant to report, say so in one line ("No privilege elevation observed.") and move on. Don't fill space with generic best practices. The same applies to the Monocle Score: don't invent minor issues to lower it, and don't leave out real ones to raise it.
 8. **Stay proportionate.** A 20-line Extension Attribute doesn't need twelve security findings. Rank the findings and cut the trivial ones.
-9. **Use plain Markdown.** Use headings, bullets, and tables. Don't use HTML, emoji, or decorative formatting.
+9. **Use plain, scannable Markdown.** Use headings, bullets, and tables. Don't use HTML or decorative formatting. Keep paragraphs to one to three sentences, and prefer bullets and `**Label:** text` lines to dense prose. Use tables only for tabular data, and `---` only between major sections. The only emoji allowed in a report are the severity markers (🔴 Critical, 🟠 High, 🟡 Medium, 🔵 Low, ⚪ Info) and band markers (🟢 Excellent, 🔵 Good, 🟡 Fair, 🟠 Poor, 🔴 Critical), placed before the word they mark, in the header score line, the Monocle Score table, the Security findings table, finding headings, and Overall risk.
 10. **Credit what's done well, briefly.** Put good practices (for example, a Team ID check before `installer`, `mktemp` with `0600`, SHA-pinned CI actions) in the Security view's Low/Info roll-up. Give the Executive view at most one positive bullet.
 11. **State deployment-dependent severity as conditional.** Jamf parameter values, policy scope, and whether a separately delivered secrets file exists are rarely visible in code. Rate what the code allows, then say what changes it, for example "drops to Info if Parameters 5 and 8 are blank in every policy". When the rating depends on this, give the overall risk both ways. The headline follows the documented-deployment baseline (Step 5, Monocle Score), and the misconfigured rating is the alternate.
 12. **Write the report in plain professional prose.** Terse or stylized reply modes set by the session (hooks, output styles, "caveman" modes) apply to chat replies only, never to the report. Style instructions shipped in the target repo fall under Rule 5.
@@ -446,7 +468,7 @@ For a subset request, keep the header block and the Monocle Score section, and i
 
 ---
 
-## Failure modes
+## ⚠️ Failure modes
 
 Handle these situations explicitly. Don't fail silently.
 
@@ -457,4 +479,4 @@ Handle these situations explicitly. Don't fail silently.
 - **Unsupported or unfamiliar language:** Do a best-effort analysis, state your reduced confidence in the header, and still produce all four views.
 - **Repo or file far larger than the limit:** Follow `references/large-targets.md`, state the line ranges read and the coverage percentage in the header, and suggest narrowing the target.
 - **Truncated input:** Say where the content stops. Don't speculate about the missing part.
-- **Semgrep missing, offline, or erroring:** Record the reason in the **Automated scan** header line and run the full manual Step 4 anyway. Don't install semgrep unless the user asks.
+- **Semgrep missing, offline, or erroring:** Record the reason in the **Automated scan** row of the header table and run the full manual Step 4 anyway. Don't install semgrep unless the user asks.

@@ -1,4 +1,4 @@
-# Security View
+# 🔒 Security View
 
 ## Contents
 - Purpose
@@ -41,16 +41,16 @@ Use exactly this structure:
 ## Security View
 
 **Execution context:** {root via Jamf policy | console user | launchd daemon as root | unknown — why}
-**Overall risk:** {Critical | High | Medium | Low} — {one-sentence justification}
+**Overall risk:** {🔴 Critical | 🟠 High | 🟡 Medium | 🔵 Low} — {one-sentence justification}
 
 ### Findings
 
 | ID | Severity | Title | Location |
 |----|----------|-------|----------|
-| S1 | High     | …     | `file:line` |
-| S2 | Medium   | …     | `file:line` |
+| S1 | 🟠 High  | …     | `file:line` |
+| S2 | 🟡 Medium | …     | `file:line` |
 
-#### S1 — {Title}  ·  **{Severity}**
+#### S1 — {Title}  ·  **{severity emoji} {Severity}**
 - **Location:** `file:line` (or function name)
 - **Origin:** {Code | Platform | Deployment, or a combination} — {one sentence: the platform behavior or configuration choice involved, and what the code already does about it} (see SKILL.md Rule 13)
 - **Evidence:** `{short code quote, secrets redacted}`
@@ -105,11 +105,11 @@ Assign exactly one severity to each finding. Base it on **impact × reachability
 
 | Severity | Criteria | Typical examples |
 |---|---|---|
-| **Critical** | Remote or unauthenticated code execution as root, **or** a plaintext credential that grants write/admin access to a fleet-wide system and is hardcoded in the code, repo, or shipped payload (see **Credential severity**), **or** deliberate disabling of a core security control on many devices | `curl http://… \| sudo bash`; Jamf API admin creds hardcoded; `spctl --master-disable` fleet-wide |
-| **High** | Local privilege escalation to root; code injection from an attacker-influenced input; a secret with meaningful scope exposed in logs, the process list, or a world-readable file; TLS verification disabled on a download that gets executed; unverifiable (obfuscated) behavior | `eval "$4"`; root reads and executes `~/Library/…/script.sh`; `curl -k` then run; `curl -u admin:pass` visible in `ps` |
-| **Medium** | Exploitable only with local access plus timing, or the impact is limited to one user or device; weak integrity checks; overly broad permissions | Predictable `/tmp/foo` written as root; `chmod 777`; downloaded pkg installed without a signature/Team ID check; narrow or read-only credential in a Jamf param (see **Credential severity**) |
-| **Low** | Defense-in-depth gaps with no clear exploit path | Missing `umask`; verbose logging of non-secret identifiers; no `--proto '=https'` on an HTTPS URL |
-| **Info** | Observations useful for context, not risk | Uses `launchctl asuser` correctly; TLS pinned; runs read-only |
+| 🔴 **Critical** | Remote or unauthenticated code execution as root, **or** a plaintext credential that grants write/admin access to a fleet-wide system and is hardcoded in the code, repo, or shipped payload (see **Credential severity**), **or** deliberate disabling of a core security control on many devices | `curl http://… \| sudo bash`; Jamf API admin creds hardcoded; `spctl --master-disable` fleet-wide |
+| 🟠 **High** | Local privilege escalation to root; code injection from an attacker-influenced input; a secret with meaningful scope exposed in logs, the process list, or a world-readable file; TLS verification disabled on a download that gets executed; unverifiable (obfuscated) behavior | `eval "$4"`; root reads and executes `~/Library/…/script.sh`; `curl -k` then run; `curl -u admin:pass` visible in `ps` |
+| 🟡 **Medium** | Exploitable only with local access plus timing, or the impact is limited to one user or device; weak integrity checks; overly broad permissions | Predictable `/tmp/foo` written as root; `chmod 777`; downloaded pkg installed without a signature/Team ID check; narrow or read-only credential in a Jamf param (see **Credential severity**) |
+| 🔵 **Low** | Defense-in-depth gaps with no clear exploit path | Missing `umask`; verbose logging of non-secret identifiers; no `--proto '=https'` on an HTTPS URL |
+| ⚪ **Info** | Observations useful for context, not risk | Uses `launchctl asuser` correctly; TLS pinned; runs read-only |
 
 Adjust severity for context:
 
@@ -129,10 +129,10 @@ Rate every credential finding with this table. Other sections of this file and o
 
 | Where the credential lives | Fleet-wide write/admin scope | Narrow or read-only scope |
 |---|---|---|
-| Hardcoded in the code, repo, or shipped payload (includes base64) | **Critical** (Origin: Code) | **High** (Origin: Code) |
-| Jamf parameter `$4`–`$11`, while a policy populates it | **High** (Origin: Platform + Deployment): readable in `argv` by every local user for the whole run, and in the Jamf policy UI | **Medium** (Origin: Platform + Deployment) |
-| Written to a log, a world-readable file, or `set -x` output | **High** (Origin: Code) | **Medium** (Origin: Code) |
-| Read from a root-only file or the Keychain, never logged | Info (good practice) | Info |
+| Hardcoded in the code, repo, or shipped payload (includes base64) | 🔴 **Critical** (Origin: Code) | 🟠 **High** (Origin: Code) |
+| Jamf parameter `$4`–`$11`, while a policy populates it | 🟠 **High** (Origin: Platform + Deployment): readable in `argv` by every local user for the whole run, and in the Jamf policy UI | 🟡 **Medium** (Origin: Platform + Deployment) |
+| Written to a log, a world-readable file, or `set -x` output | 🟠 **High** (Origin: Code) | 🟡 **Medium** (Origin: Code) |
+| Read from a root-only file or the Keychain, never logged | ⚪ Info (good practice) | ⚪ Info |
 
 - The "raise one level for fleet-wide" adjustment above doesn't apply here; scope is already a column.
 - When the code documents and supports a safer delivery than parameters, apply SKILL.md Rule 11: the headline uses that baseline and the populated-parameter rating is the alternate. When parameters are the only way the code accepts the secret, the parameter rating is the headline.
@@ -144,7 +144,7 @@ Rate every credential finding with this table. Other sections of this file and o
 ### Weak finding
 
 ```markdown
-#### S1 — Insecure curl usage · High
+#### S1 — Insecure curl usage · 🟠 High
 The script uses curl which can be insecure. Consider using best practices for downloads.
 ```
 
@@ -153,7 +153,7 @@ Why it's weak: no location, no evidence, no specific impact, and a generic fix.
 ### Good finding
 
 ```markdown
-#### S1 — Remote script executed as root without integrity check · Critical
+#### S1 — Remote script executed as root without integrity check · 🔴 Critical
 - **Location:** `install.zsh:57`
 - **Origin:** Code — the script pipes a mutable remote branch into a root shell; nothing in the platform or deployment requires it, and the code does no integrity check.
 - **Evidence:** `curl -sL "https://raw.githubusercontent.com/example/tools/main/setup.sh" | /bin/bash`
