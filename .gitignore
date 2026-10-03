@@ -1,2 +1,6 @@
 # Monocle reports (security findings; never commit)
 /reports/
+
+# macOS
+.DS_Store
+Icon?

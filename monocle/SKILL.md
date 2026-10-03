@@ -55,7 +55,7 @@ Do not use Monocle for a line-by-line code review, for fixing code, or for binar
 
 ## 1️⃣ Step 1 — Determine the input type
 
-Classify the input before reading anything else. Name the type in the report header.
+Classify the input before reading anything else. Name the type in the report's Scope section.
 
 ### A and B. GitHub URL
 
@@ -74,7 +74,7 @@ A GitHub URL is target content too (Rule 5): refs and file paths can carry shell
 1. If the path is a file, treat it as C.
 2. If it is a directory, list the tree and skip `.git/`, `node_modules/`, `venv/`, `.venv/`, `__pycache__/`, `vendor/`, `dist/`, `build/`, and binaries.
 3. If it is a git repo, record `git rev-parse HEAD`, `git branch --show-current`, `git status --short` (uncommitted changes matter), and the output of `git log --format='%an' | sort | uniq -c | sort -rn | head` for the Manager view.
-4. Also run `git status --short --ignored` and compare `find` output with `git ls-files`. Local-only helpers (for example, a gitignored release script) exist only in this checkout. Semgrep skips untracked files that `.gitignore` excludes (it still scans untracked files that aren't ignored), so read the ignored ones manually and mark all local-only files "untracked, local only" in the header.
+4. Also run `git status --short --ignored` and compare `find` output with `git ls-files`. Local-only helpers (for example, a gitignored release script) exist only in this checkout. Semgrep skips untracked files that `.gitignore` excludes (it still scans untracked files that aren't ignored), so read the ignored ones manually and mark all local-only files "untracked, local only" in the Scope section.
 
 ### E. Diagnostic or support bundle
 
@@ -93,7 +93,7 @@ If the input is ambiguous (for example, a bare repo name), ask one clarifying qu
 Monocle targets **single scripts and small repos**: about 30 source files or about 5,000 lines of code.
 
 - **Within limits:** analyze every source file.
-- **Over limits:** analyze entry points and high-risk files first, then as much else as practical. List what you skipped in the report header under **Scope caveats**. Never imply full coverage when you don't have it.
+- **Over limits:** analyze entry points and high-risk files first, then as much else as practical. List what you skipped under **Scope caveats** in the report's Scope section. Never imply full coverage when you don't have it.
 
 Treat these files as entry points or high-risk files, roughly in this order:
 
@@ -110,7 +110,7 @@ Treat these files as entry points or high-risk files, roughly in this order:
 11. Superseded or legacy scripts still tracked in the repo (for example, a standalone script in `Resources/` whose job the main script now does). They are deployable even when the docs don't deploy them. Analyze them to the same standard as the main script: rate them Info at the documented baseline, and give their own flaws as the alternate (Rule 11).
 12. Distribution manifests in other repos (Homebrew tap formulae, pkg build repos, Jamf script repos): context outside the target, not scored. Fetch and record them as in `references/specialized-checks.md`, Release pipelines.
 
-Record every file you analyze. The report header lists them.
+Record every file you analyze. The report's Scope section lists them.
 
 **Read-only or plan mode.** If the session doesn't allow writes yet, do Steps 1–4 with streaming reads only (`cat`, `sed -n`, `unzip -p`, `git show`, `ls -ld`). Defer scratch extraction, the semgrep run, isolated tool checks (Rule 4), and the report write until execution is allowed, and list them as pending steps in the plan.
 
@@ -250,13 +250,13 @@ Before writing, check the reports directory (resolved as in item 9 below; also c
 1. Load the reference file for each view you will write. Load them one at a time, as you write.
 2. Write the views in this order: **Executive → Security → Manager → Engineer**. The Executive view goes first because it is the one people are most likely to read; build it from the fact sheet, not from the other views.
 3. Follow each reference's structure, tone, and length limits exactly.
-4. Make sure the views agree with each other. For example, if Security rates a finding Critical, Executive must reflect that risk and Manager must list an action item for it. The Monocle Score band must also agree with the Security view's Overall risk and the Executive Recommendation.
+4. Make sure the views agree with each other. For example, if Security rates a finding Critical, Executive must reflect that risk and Manager must list an action item for it. The Monocle Score band must also agree with the Security view's Overall risk and the Executive Recommendation, and the **Overall risk** and **Recommendation** lines in the Monocle Score section must repeat them exactly.
 5. Look for compounding findings. One finding can make another worse, as when persistence the code installs gives a local privilege escalation a root-executed target, or a forgeable cache undermines the compliance data the tool exists to produce. Explain those in **Cross-cutting notes**. More patterns to check:
    - **Slow work extends secret exposure.** Heavy discovery (`mdfind`, `system_profiler`) that runs before a fast-path exit keeps `$4`–`$11` in `argv` longer.
    - **A version gate can strand security fixes.** When a nightly persistent job keeps a cache fresh, a version-gated shortcut never expires, so hardening credited in the Security view may not have reached devices.
    - **Self-updating tools amplify release-pipeline findings.** A tool that upgrades itself on a schedule installs a compromised release automatically, and nobody is present to notice.
    - **Unattended schedules amplify network findings.** A scheduled job runs on whatever network the laptop is on at the time (hotel, café), and nobody watches it.
-6. **Compute the Monocle Score** from the finished findings, as described in **Monocle Score** below. Put it in the header and in the score section of the report.
+6. **Compute the Monocle Score** from the finished findings, as described in **Monocle Score** below. Put it in the `## Monocle Score` section, which starts on the report's second line.
 7. **Verify every citation before delivering, in two passes.**
    - **Pass 1, before writing:** verify each `file:line` you collected, in one batch: `for n in 33 60 …; do printf '%s: %s\n' $n "$(sed -n "${n}p" file)"; done`.
    - **Pass 2, after writing:** citations added while drafting drift most. This includes supporting lines, credits, JSON field lines, and refactor anchors; in practice about 1 in 30 was wrong. List every reference in the finished report with ``grep -oE '`[^` ]*:[0-9]+(–[0-9]+)?`' "$reports/monocle-{target}-{timestamp}.md" | sort -u`` (matching only backtick-quoted references skips times such as 00:53) and re-check any not covered by pass 1.
@@ -265,10 +265,11 @@ Before writing, check the reports directory (resolved as in item 9 below; also c
    - Shorthand such as `` `:120` `` refers to the last file named in the same bullet. Never mix files in one parenthetical with shorthand (`` (`README.md:40`, `:120`) `` reads as README line 120). Write the full `file:line` whenever the file changes. Pass 2 lists shorthand as bare `` `:NNN` `` matches; check that each one has an unambiguous file.
    - Any file name in the bullet counts as "last file named", including data files mentioned in prose (`` `metadata.txt` truncates hashes (`:130`) `` reads as `metadata.txt` line 130). Roll-up and credit bullets drift most here, so give them full paths.
    - **Check refactor snippets as well as citations.** Test each "after" snippet against every platform variant the target supports: Apple silicon and Intel Homebrew prefixes, zsh and bash, and the oldest supported interpreter as well as the current one. Snippets that derive paths or parse tool output are wrong most often. For example, `Path(brew).resolve()` gives the wrong prefix on Intel.
-8. **Date- and time-stamp the report.**
-   - Get the timestamp from `date '+%Y-%m-%d %H:%M %Z'` (or the session's current date and time when no shell is available) and put it in the **Date** row of the header table.
+8. **Stamp the report with the date, time, and generating model.**
+   - Get the timestamp from `date '+%Y-%m-%d %H:%M %Z'` (or the session's current date and time when no shell is available) and put it in the **Date** row of the Scope table.
    - It records when the analysis ran, not when the code was committed; the SHA or ref covers that.
    - Never guess it from commit history or training data.
+   - **Record the generating model.** Set **Generated by** to the name of the model that produced the report, plus a version or short identifier when the runtime exposes one, for example `Claude Sonnet 4.5`, `GPT-5`, `Grok 4`, or `Codex`. If the exact model string is unknown, use the best available label from the session (product name, API model id, or agent name), and never invent a version. Put it in both the Monocle Score section's **Generated by** line and the Scope table's **Generated by** row. Never omit it.
 9. **Write the report to the reports directory.**
    - Always save the full report, whatever its length, to one central reports directory. Resolve it in this order, regardless of the current working directory or the target's location:
      1. `$MONOCLE_REPORTS_DIR`, if set.
@@ -292,7 +293,7 @@ Before writing, check the reports directory (resolved as in item 9 below; also c
    - Never choose the target repo as a report destination automatically. The two exceptions are Monocle reviewing its own checkout, where option 2 applies, and an explicit `$MONOCLE_REPORTS_DIR` override. In either case, reports may be written inside a git repo only after the path is confirmed gitignored.
    - Reports contain security findings. If `$reports` is inside a git repository, make sure the path is gitignored before writing (`git -C "$reports" check-ignore -q "$reports/probe.md"`), and warn the user if it isn't. The Monocle repo's `.gitignore` already excludes `/reports/`.
 
-   - Name the file `monocle-{target}-{YYYY-MM-DD-HHMM}.md`, using the same timestamp as the header (`date '+%Y-%m-%d-%H%M'`). `{target}` is the repo or file basename, lowercased, with anything outside `[a-z0-9._-]` replaced by `-`. Including the time keeps same-day re-runs from overwriting each other; if the name still exists, append `-2`, `-3`, and so on. Never overwrite an existing report.
+   - Name the file `monocle-{target}-{YYYY-MM-DD-HHMM}.md`, using the same timestamp as the **Date** row (`date '+%Y-%m-%d-%H%M'`). `{target}` is the repo or file basename, lowercased, with anything outside `[a-z0-9._-]` replaced by `-`. Including the time keeps same-day re-runs from overwriting each other; if the name still exists, append `-2`, `-3`, and so on. Never overwrite an existing report.
    - Keep working files (clones, fetched sources, `semgrep.json`, `semgrep.err`) in the scratch directory. `$reports` holds finished reports only.
    - If `$reports` can't be created or written (read-only sandbox, path outside the agent's writable roots, no filesystem access), deliver the report inline and say why.
    - In the reply, give the report's absolute path, the Monocle Score, the overall risk and recommendation, the findings table, and any notable non-security issue. Don't paste the full report unless the user asks.
@@ -360,24 +361,18 @@ Use this layout for the full report. Keep all headings, even when a section is s
 
 ```markdown
 # Monocle Report: {target name}
-**Monocle Score:** {n}/100 ({band emoji} {band}) at the documented-deployment baseline — {basis, e.g. "1 High, 1 Medium, 3 Low, 9 non-security"}{, or {n2}/100 ({band2 emoji} {band2}) if {admin condition is not met}}{; up/down from {prior} at {prior ref}}
-
-| Field | Value |
-|---|---|
-| **Date** | {YYYY-MM-DD HH:MM TZ} |
-| **Target** | {URL or path} ({input type}) |
-| **Ref** | {SHA / branch / "attached file"} |
-| **Language(s)** | {…} |
-| **Files analyzed** | {n} — {list, or top 10 + "and N more"} |
-| **Automated scan** | {semgrep {version} — {rulesets} — {n} results ({m} confirmed), {e} parse errors, {k} files skipped (size / .semgrepignore / gitignored); or "semgrep not installed"; or "registry unreachable"} |
-| **Scope caveats** | {"None", or "See below"} |
-
-**Scope caveats:**
-- **{Short label}.** {One caveat per bullet: skipped files, coverage, unfetchable deps, assumptions, isolated checks, side effects. Nest bullets for line ranges and lists.}
-
----
-
 ## Monocle Score
+
+<details>
+<summary>Monocle Score: {n}/100 ({band emoji} {band}) — {recommendation}</summary>
+
+**Score:** {n}/100 ({band emoji} {band}) at the documented-deployment baseline — {basis, e.g. "1 High, 1 Medium, 3 Low, 9 non-security"}{, or {n2}/100 ({band2 emoji} {band2}) if {admin condition is not met}}{; up/down from {prior} at {prior ref}}
+
+**Overall risk:** {severity emoji} {severity}
+
+**Recommendation:** {recommendation}
+
+**Generated by:** {model name and, if available, version or identifier}  ·  **Skill:** monocle
 
 | Source | IDs | Count | Each | Deduction |
 |---|---|---|---|---|
@@ -395,39 +390,115 @@ Use this layout for the full report. Keep all headings, even when a section is s
 
 **Operator baseline:** {What the headline assumes the Mac Admin has done, one bullet per condition, each naming the finding it flips, e.g. "Every interactive policy sets the allowlist parameter and excludes EDR removal (S2 → High if not)". Or "None — the score doesn't depend on deployment."}
 
+</details>
+
+---
+
+## Contents
+
+- [Monocle Score](#monocle-score)
+- [Executive View](#executive-view)
+- [Security View](#security-view)
+- [Manager View](#manager-view)
+- [Engineer View](#engineer-view)
+- [Cross-cutting notes](#cross-cutting-notes)
+- [Scope](#scope)
+
 ---
 
 ## Executive View
+
+<details>
+<summary>Executive View: {recommendation} — {top reason, in a few plain words}</summary>
+
 {per references/executive.md}
+
+</details>
 
 ---
 
 ## Security View
+
+<details>
+<summary>Security View: {severity emoji} {overall risk} risk — {scored finding counts, e.g. "1 High, 2 Low findings", or "no scored findings"}</summary>
+
 {per references/security.md}
+
+</details>
 
 ---
 
 ## Manager View
+
+<details>
+<summary>Manager View: {maturity}; {ownership in a few words}</summary>
+
 {per references/manager.md}
+
+</details>
 
 ---
 
 ## Engineer View
+
+<details>
+<summary>Engineer View: {top engineering takeaway}</summary>
+
 {per references/engineer.md}
+
+</details>
 
 ---
 
 ## Cross-cutting notes
-{Optional. Only for issues that span views or need a decision. Omit the section if there is nothing to add.}
+
+<details>
+<summary>Cross-cutting notes: {main compounding point or decision}</summary>
+
+{Optional. Only for issues that span views or need a decision. Omit the section, and its Contents link, if there is nothing to add.}
+
+</details>
+
+---
+
+## Scope
+
+<details>
+<summary>Scope: {short ref or input type} — {files analyzed}, {main coverage caveat, or "full coverage"}</summary>
+
+| Field | Value |
+|---|---|
+| **Date** | {YYYY-MM-DD HH:MM TZ} |
+| **Target** | {URL or path} ({input type}) |
+| **Ref** | {SHA / branch / "attached file"} |
+| **Generated by** | {model name and, if available, version or identifier} |
+| **Language(s)** | {…} |
+| **Files analyzed** | {n} — {list, or top 10 + "and N more"} |
+| **Automated scan** | {semgrep {version} — {rulesets} — {n} results ({m} confirmed), {e} parse errors, {k} files skipped (size / .semgrepignore / gitignored); or "semgrep not installed"; or "registry unreachable"} |
+| **Scope caveats** | {"None", or "See below"} |
+
+**Scope caveats:**
+- **{Short label}.** {One caveat per bullet: skipped files, coverage, unfetchable deps, assumptions, isolated checks, side effects. Nest bullets for line ranges and lists.}
+
+</details>
+
+---
+
+[Generated by Monocle](https://github.com/dan-snelson/Monocle)
 ```
 
-Header layout:
+Report layout:
 
-- The score line follows the title directly, so it is always the report's second line.
-- Each header table cell holds one line. Don't use HTML such as `<br>`, and don't put a `|` inside a cell.
+- `## Monocle Score` follows the title directly, with no blank line between, so it always starts on the report's second line. Its **Score**, **Overall risk**, **Recommendation**, and **Generated by** lines come first, ahead of the deduction table.
+- `## Contents` follows the Monocle Score section. It lists every `##` heading in the report except itself, as anchor links (lowercase, spaces become `-`, punctuation dropped). Drop the link for any section the report omits.
+- Every `##` section except Contents wraps its body in `<details>`. The heading itself stays outside, so Contents links resolve. Every section starts collapsed (plain `<details>`, never `<details open>`); its `<summary>` carries the result.
+- Each `<summary>` is the heading text, a colon, and the section's main result, so a reader gets the score, recommendation, overall risk, and key takeaways without expanding anything. Write the result after the body is final, and keep it consistent with the body: the score, band, overall risk, and recommendation match the body exactly. Keep it to one line of about 90 characters or fewer, in plain text: no Markdown, backticks, or links, which don't render inside `<summary>`. The full body stays inside the block; the summary adds a takeaway, it doesn't replace content.
+- Leave a blank line after `</summary>` and before `</details>`. Without them, Markdown inside the block doesn't render.
+- Scope is the last `##` section. The report ends with a `---` line and the footer `[Generated by Monocle](https://github.com/dan-snelson/Monocle)`, after Scope's `</details>`, with nothing after the footer.
+- Each Scope table cell holds one line. Don't use HTML such as `<br>`, and don't put a `|` inside a cell.
 - Anything with several parts goes in the **Scope caveats** bullet list under the table: coverage line ranges, read-directly vs pattern-scanned file lists, isolated-check evidence, side effects. Start each bullet with a bold label. When the row says "None", omit the list.
 
-For a subset request, keep the header block and the Monocle Score section, and include only the requested view sections. Compute the score from the full analysis (Steps 1–4 always run), not from the views you wrote.
+For a subset request, keep the Monocle Score, Contents, and Scope sections (Scope still last) and the footer, include only the requested view sections, and list only those in Contents. Compute the score from the full analysis (Steps 1–4 always run), not from the views you wrote.
 
 ---
 
@@ -446,7 +517,7 @@ For a subset request, keep the header block and the Monocle Score section, and i
 6. **Redact secrets.** Show at most the first 4 characters. Never repeat a full credential.
 7. **Don't pad.** If a view has nothing significant to report, say so in one line ("No privilege elevation observed.") and move on. Don't fill space with generic best practices. The same applies to the Monocle Score: don't invent minor issues to lower it, and don't leave out real ones to raise it.
 8. **Stay proportionate.** A 20-line Extension Attribute doesn't need twelve security findings. Rank the findings and cut the trivial ones.
-9. **Use plain, scannable Markdown.** Use headings, bullets, and tables. Don't use HTML or decorative formatting. Keep paragraphs to one to three sentences, and prefer bullets and `**Label:** text` lines to dense prose. Use tables only for tabular data, and `---` only between major sections. The only emoji allowed in a report are the severity markers (🔴 Critical, 🟠 High, 🟡 Medium, 🔵 Low, ⚪ Info) and band markers (🟢 Excellent, 🔵 Good, 🟡 Fair, 🟠 Poor, 🔴 Critical), placed before the word they mark, in the header score line, the Monocle Score table, the Security findings table, finding headings, and Overall risk.
+9. **Use plain, scannable Markdown.** Use headings, bullets, and tables. Don't use HTML or decorative formatting, except the `<details>` and `<summary>` wrappers the Output template prescribes. Keep paragraphs to one to three sentences, and prefer bullets and `**Label:** text` lines to dense prose. Use tables only for tabular data, and `---` only between major sections and before the footer. The only emoji allowed in a report are the severity markers (🔴 Critical, 🟠 High, 🟡 Medium, 🔵 Low, ⚪ Info) and band markers (🟢 Excellent, 🔵 Good, 🟡 Fair, 🟠 Poor, 🔴 Critical), placed before the word they mark, in the Monocle Score and Security View `<summary>` lines, the Monocle Score section's Score and Overall risk lines, the Monocle Score table, the Security findings table, finding headings, and Overall risk.
 10. **Credit what's done well, briefly.** Put good practices (for example, a Team ID check before `installer`, `mktemp` with `0600`, SHA-pinned CI actions) in the Security view's Low/Info roll-up. Give the Executive view at most one positive bullet.
 11. **State deployment-dependent severity as conditional.** Jamf parameter values, policy scope, and whether a separately delivered secrets file exists are rarely visible in code. Rate what the code allows, then say what changes it, for example "drops to Info if Parameters 5 and 8 are blank in every policy". When the rating depends on this, give the overall risk both ways. The headline follows the documented-deployment baseline (Step 5, Monocle Score), and the misconfigured rating is the alternate.
 12. **Write the report in plain professional prose.** Terse or stylized reply modes set by the session (hooks, output styles, "caveman" modes) apply to chat replies only, never to the report. Style instructions shipped in the target repo fall under Rule 5.
@@ -488,7 +559,7 @@ Handle these situations explicitly. Don't fail silently.
 - **Rate-limited:** Retry once through `gh` if possible. Otherwise report partial results and list the unfetched files under Scope caveats.
 - **Binary, compiled, or minified input:** Decline the deep analysis. Report what metadata shows (file type, signature via `codesign -dv` if local, strings of interest) and explain the limitation.
 - **Obfuscated script** (large base64 blobs, `eval` of encoded strings): Don't decode and execute. Decode statically only if it is safe and easy to do. Otherwise flag it as a High security finding: behavior can't be verified.
-- **Unsupported or unfamiliar language:** Do a best-effort analysis, state your reduced confidence in the header, and still produce all four views.
-- **Repo or file far larger than the limit:** Follow `references/large-targets.md`, state the line ranges read and the coverage percentage in the header, and suggest narrowing the target.
+- **Unsupported or unfamiliar language:** Do a best-effort analysis, state your reduced confidence in the Scope section, and still produce all four views.
+- **Repo or file far larger than the limit:** Follow `references/large-targets.md`, state the line ranges read and the coverage percentage in the Scope section, and suggest narrowing the target.
 - **Truncated input:** Say where the content stops. Don't speculate about the missing part.
-- **Semgrep missing, offline, or erroring:** Record the reason in the **Automated scan** row of the header table and run the full manual Step 4 anyway. Don't install semgrep unless the user asks.
+- **Semgrep missing, offline, or erroring:** Record the reason in the **Automated scan** row of the Scope table and run the full manual Step 4 anyway. Don't install semgrep unless the user asks.

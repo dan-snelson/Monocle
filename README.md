@@ -1,8 +1,8 @@
 # 🔍 Monocle
 
-Monocle inspects scripts and small repos (local or on GitHub), plus diagnostic and support bundles, and produces four audience-specific summaries (Executive, Security, Manager, Engineer) plus a 0–100 **Monocle Score**, where 100 means no issues.
+Monocle inspects scripts and small repos (local or on GitHub), plus diagnostic and support bundles, and produces four audience-specific summaries (Executive, Security, Manager, Engineer) plus a `0` to `100` **Monocle Score**, where `100` means no issues.
 
-Monocle is an [Agent Skill](https://agentskills.io) tuned for shell (sh/bash/zsh), Python, AppleScript, Swift helpers, and Jamf/macOS automation. It pays particular attention to privilege elevation, silent failures, secrets, and environment assumptions.
+Monocle is an [Agent Skill](https://agentskills.io) tuned for shell (`sh` /`bash` / `zsh`), Python, AppleScript, Swift helpers, and Jamf Pro / macOS automation. It pays particular attention to privilege elevation, silent failures, secrets, and environment assumptions.
 
 | View      | For                       | Answers |
 |-----------|---------------------------|---------|
