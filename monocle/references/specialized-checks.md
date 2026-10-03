@@ -1,5 +1,16 @@
 # Specialized Checks
 
+## Contents
+- Purpose
+  - Bundle intake (SKILL.md Step 1 E)
+  - Data scan (bundles and logs)
+  - Collectors and archivers
+  - Shared directories (app-owned paths and exploit targets)
+  - Jamf parameter secrets
+  - Per-user tools and home-directory secrets
+  - Release pipelines
+  - Destructive scope (Rule 14 overreach)
+
 ## Purpose
 
 SKILL.md Step 1 E and Step 4 checks that apply only to some targets. Load this file when its trigger applies; each section's checks are then mandatory, like the rest of Step 4.

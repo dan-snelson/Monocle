@@ -1,5 +1,22 @@
 # Manager View
 
+## Contents
+- Purpose
+- Structure and tone
+- Key questions the summary must answer
+- Prioritization and rating guidance
+  - Maturity
+  - Change risk
+  - Action item priority
+- Good vs weak examples
+  - Weak
+  - Good
+- Language notes
+  - Shell (sh / bash / zsh)
+  - Python
+  - AppleScript
+  - Jamf / macOS
+
 ## Purpose
 
 The Manager view helps a team lead or service owner decide:

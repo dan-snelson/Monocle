@@ -1,5 +1,16 @@
 # Executive View
 
+## Contents
+- Purpose
+- Structure and tone
+- Key questions the summary must answer
+- Prioritization
+- Good vs weak examples
+  - Weak
+  - Good
+  - Good (low-risk case)
+- Language notes
+
 ## Purpose
 
 The Executive view tells a non-technical decision-maker, in under a minute of reading:
