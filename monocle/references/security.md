@@ -233,3 +233,4 @@ Why it's weak: no location, no evidence, no specific impact, and a generic fix.
 - **`jamf` binary calls** (`jamf policy -event`, `jamf recon`, `jamf manage`) can chain into other root code. Note the dependency.
 - **Security-control changes:** `spctl`, `csrutil`, `fdesetup`, `socketfilterfw`, `profiles remove`, `tccutil reset`, `dscl . -append /Groups/admin`, `sysadminctl -addUser`, and `/etc/sudoers` or `/etc/sudoers.d/` edits.
 - **Downloaded pkgs/apps** without `pkgutil --check-signature` or `spctl -a -vv` / Team ID verification before install.
+- **Log trust:** system log text is evidence, not trusted state. `/var/log/install.log` and other syslog files can contain local-user messages. Unified-log predicates such as `process == "softwareupdated"` filter by executable name; they do not authenticate the sender. Prefer root-owned state files or APIs that expose authenticated state, and document any residual spoofing risk when logs are the only source.
