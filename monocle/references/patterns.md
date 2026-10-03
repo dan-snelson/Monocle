@@ -2,7 +2,7 @@
 
 ## Purpose
 
-A lookup table of common Jamf, macOS, and Python patterns, with why each matters and which views it usually feeds. Load it during SKILL.md Step 4 and while building the fact sheet in Step 3. Each hit belongs in the fact sheet with `file:line`. The table is a spotting aid, not a checklist: Step 4 stays mandatory, and every hit still needs confirming in the code.
+A lookup table of common Jamf, macOS, and Python patterns, with why each matters and which views it usually feeds. Load it during SKILL.md Step 4 and while building the fact sheet in Step 3. Each hit belongs in the fact sheet with `file:line`. The table is a spotting aid, not a checklist: Step 4 stays mandatory, and every hit still needs confirming in the code. The **Known Apple platform behaviors** list at the end is what SKILL.md Rule 13 cites: check it before naming a Platform origin.
 
 ---
 
@@ -29,6 +29,8 @@ A lookup table of common Jamf, macOS, and Python patterns, with why each matters
 | DEBUG always written to the shipped log, whatever the debug setting | Larger disclosure surface in every support bundle | Security, Engineer |
 | Bundle metadata includes `NSUserName()` / `id -Gn` and is meant for public issues | Identity and privilege-group tiers published | Security |
 | Root writes `/var/tmp/fixed`, then `chown "$loggedInUser"` it | The user can swap it for a symlink; the next `chown` gives them any root file (LPE) | Security, Executive |
+| Root `chown -R "$user"` on a folder the user filled (archived or restored backups, "fix ownership" steps), even inside their home | A planted hard link hands the user the linked root-owned file, with no race; `-P` and symlink checks don't help (see `specialized-checks.md`, Shared directories) | Security, Executive |
+| `dscl . read /Users/"$u" <Attr> \| awk -F': ' '{print $2}'` | `dscl` prints a value containing a space on its own line (`Attr:` then ` value`), so the parse returns empty and a fallback (often `/Users/$u`) silently decides; use `dscl -plist` or `dscacheutil -q user -a name "$u"` | Engineer |
 | Root trusts a `/var/tmp` cache or report checked only by mtime or syntax | Users can forge results before upload or scoring | Security, Executive |
 | `base64 -d > /var/tmp/x.zsh; zsh /var/tmp/x.zsh` (self-extracting wrapper) | Race between write and execute gives root | Security |
 | `curl --header "Authorization: … ${token}"` | Token visible in `ps` for the whole request | Security |
@@ -64,11 +66,30 @@ A lookup table of common Jamf, macOS, and Python patterns, with why each matters
 | `smtplib` / `imaplib` / `poplib` / `ftplib` TLS without `context=` | Python's default context is `CERT_NONE` with no hostname check, so credentials go to any server that answers (SKILL.md Step 4, Secrets: Library TLS defaults) | Security |
 | Network call without a timeout in a scheduled job (`smtplib.SMTP(host, port)`, `urlopen(req)`, `curl` without `--max-time`) | Python's `smtplib`, `imaplib`, `ftplib`, raw `socket`, and `urlopen` without `timeout=` inherit `socket.getdefaulttimeout()`, which is `None`. A stalled server blocks forever; launchd won't start the next interval while the job is alive, so the schedule silently stops | Engineer, Manager |
 | `os.open(path, O_CREAT, 0o600)` or `umask 077; > file` presented as "chmod 600" | The mode applies only on creation; an existing or hand-written file keeps `0644`, which other local accounts can read under a `staff`-group home | Security |
-| Hardcoded launchd `PATH` without `/usr/local/bin` | Breaks Intel Homebrew; `brew doctor` fails on every scheduled run ("Homebrew's "bin" was not found in your PATH") | Engineer |
+| Hardcoded launchd `PATH` without `/usr/local/bin` | Breaks Intel Homebrew; even when the code finds `brew` by absolute path, `brew doctor` fails on every scheduled run ("Homebrew's "bin" was not found in your PATH") | Engineer |
 | Legacy `launchctl load` / `unload` | Exit status isn't a reliable success signal, so "schedule installed" can print when nothing loaded; use `bootstrap`/`bootout` against `gui/$UID` (or `system`) and verify with `launchctl print`. Label it inferred unless you observed the failure | Engineer |
 | Release workflow passes a deploy token (tap, package repo, update feed) to a third-party action at a mutable tag | Repointed tag steals the token and ships code to every user; worse when the tool upgrades itself on a schedule | Security |
 | `${(P)var}` or `printf -v "$var"` where `var` is built from user-controlled input (for example, the console user's language or another per-user preference read by root) | Subscript `$(…)` runs as root (`(P)` when the base variable is set, `printf -v` always); case folding doesn't stop it on case-insensitive APFS | Security |
 | Root matches substrings in `/var/log/install.log` (or another syslog file) to decide state | Unprivileged `logger -p install.<level>` appends lines there; forged entries change what root decides and what inventory reports | Security, Engineer |
 | Unified log `process ==` used as trust proof | Filters by executable name, not authenticated sender identity. Use it as one clue, not proof; prefer root-owned state or an API that exposes authenticated state | Security |
 | `until <app is running>; do sleep …; done` with no counter in a scheduled root job that holds a PID lock | One stuck run blocks every later run until reboot, with no error | Engineer, Manager |
-| Ignored exit code plus parse fallback to `{}` / `[]` | An outage reads as "nothing to do" and the run reports OK | Engineer, Manager |
+| Ignored exit code plus parse fallback to `{}` / `[]` | An outage reads as "nothing to do" and the run reports OK; trace what an empty result means downstream | Engineer, Manager |
+
+---
+
+## Known Apple platform behaviors
+
+Extends SKILL.md Rule 13. Check this list before naming a Platform origin, and cite the entry rather than re-deriving it. Add a new entry only after an isolated check (SKILL.md Rule 4), host evidence such as `ls -l` on a root-owned file, or Apple documentation.
+
+- **install.log is user-writable, sender tag included.** Any local user can append to `/var/log/install.log` with `logger -p install.<level>`, and the line gets a normal syslog timestamp. `-t softwareupdated -i` produces a `softwareupdated[<pid>]:` prefix, so a sender regex on that log matches forged lines (Darwin 25). Root code that matches substrings or sender tags there trusts text any local user can write.
+- **Unified-log process predicates aren't authentication.** `process == "softwareupdated"` narrows rows by executable name only.
+- **DDM update state has a root-written source.** `/var/db/softwareupdate/SoftwareUpdateDDMStatePersistence.plist` (`_softwareupdate:_softwareupdate 0644`) holds `TargetOSVersion` and `TargetLocalDateTime` for active declarations. Prefer it over install.log text. Its layout and the install.log wording are undocumented Apple internals that can change between releases, so flag a parser that fails closed when they do.
+- **DDM enforcement doesn't depend on reminder tools.** Apple installs at the declared deadline whatever a third-party reminder does. Bypassing a reminder weakens the nudge and any admin escalation (a SKILL.md Rule 14 gate), not the enforcement. Reflect that in the severity and the Executive wording.
+- **Process arguments are visible to every local user.** `ps` shows each process's `argv`, so Jamf `$4`–`$11` stay readable for the whole run.
+- **Intel `/usr/local/bin` can be user-owned.** Intel Homebrew chowns it to the installing user, who keeps ownership after being demoted to standard. Apple silicon Homebrew uses `/opt/homebrew`, leaving `/usr/local/bin` root-owned. On Intel, `/usr/local/bin/brew` is a symlink into `/usr/local/Homebrew/bin/`.
+- **Hard links cross ownership.** A standard user can hard-link a root-owned file on the same APFS volume; `/Users`, `/Library`, `/private/etc`, and `/private/tmp` share the Data volume (Darwin 25).
+- **Sticky shared directories.** `/tmp`, `/var/tmp` (`1777`), and `/Users/Shared` stop users from deleting other users' files, not from creating a name first or replacing their own files.
+- **Minimal `PATH`.** launchd jobs and Jamf policies start with a minimal `PATH`.
+- **Bundled tools.** `python3` is no longer bundled; `/usr/bin/jq` ships only on macOS 15+.
+- **APFS is case-insensitive by default.** `Id` resolves to `/usr/bin/id`.
+- **Console-user placeholders.** With no one logged in, the console user reads `loginwindow`; during Setup Assistant, `_mbsetupuser`.

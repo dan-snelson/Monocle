@@ -23,7 +23,7 @@ monocle/
     ├── engineer.md
     ├── github-input.md         # Safe URL handling and fetch steps for GitHub targets
     ├── large-targets.md        # Reading plan and coverage for oversized targets
-    ├── patterns.md             # Quick-reference table of risky Jamf/macOS/Python patterns
+    ├── patterns.md             # Quick-reference table of risky Jamf/macOS/Python patterns, plus Known Apple platform behaviors
     ├── semgrep.md              # Automated-scan command, rulesets, skip accounting, and triage
     ├── specialized-checks.md   # Bundle intake and the conditional Step 4 checks, loaded on trigger
     ├── prior-reports.md        # Using an earlier report on the same target
