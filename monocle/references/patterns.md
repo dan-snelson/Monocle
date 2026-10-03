@@ -1,4 +1,4 @@
-# Pattern Quick Reference
+# 🔍 Pattern Quick Reference
 
 ## Purpose
 

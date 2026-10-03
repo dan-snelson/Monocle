@@ -1,4 +1,4 @@
-# Monocle Score Worked Example
+# 📈 Monocle Score Worked Example
 
 ## Purpose
 
@@ -12,18 +12,18 @@ A fully worked Monocle Score calculation for SKILL.md Step 5. Load it when a sco
 
   | ID | Finding | Rating | Points |
   |---|---|---|---|
-  | S1 | Root installs packages from a user-writable staging directory with a name-only signature check | High (Code defect) | 20 |
-  | S2 | EDR removal and full app removal are offered when the allowlist parameter is blank | Low: an intended, documented, admin-gated capability with an unsafe default, so a secure-default gap (Rule 14) | 3 |
-  | S3 | A tracked self-extracting wrapper | Info, because the documentation deploys the main script | 0 |
-  | S4 | — | Medium | 8 |
-  | S5 | Root runs `/usr/local/bin/dialog` | Low, assuming a root-owned `/usr/local/bin` | 3 |
-  | S6–S8 | — | Low | 9 |
-  | S9 | — | Info | 0 |
+  | S1 | Root installs packages from a user-writable staging directory with a name-only signature check | 🟠 High (Code defect) | 20 |
+  | S2 | EDR removal and full app removal are offered when the allowlist parameter is blank | 🔵 Low: an intended, documented, admin-gated capability with an unsafe default, so a secure-default gap (Rule 14) | 3 |
+  | S3 | A tracked self-extracting wrapper | ⚪ Info, because the documentation deploys the main script | 0 |
+  | S4 | — | 🟡 Medium | 8 |
+  | S5 | Root runs `/usr/local/bin/dialog` | 🔵 Low, assuming a root-owned `/usr/local/bin` | 3 |
+  | S6–S8 | — | 🔵 Low | 9 |
+  | S9 | — | ⚪ Info | 0 |
 
   Security total: 43.
 - **Non-security.** 9 endpoint issues cost 18. Issues in a local release helper and a repo sync script are maintainer tooling: not scored.
-- **Headline:** 100 − 61 = **39/100 (Poor)**. The High range (25–69) doesn't bind.
-- **Alternate:** suppose any interactive policy leaves the allowlist blank, the wrapper is deployed, and `/usr/local/bin` is user-owned. Then S2 is High, S3 Medium, and S5 Medium: 100 − (73 + 18) = 9, **floored at 25 → 25/100 (Poor)**.
+- **Headline:** 100 − 61 = **39/100 (🟠 Poor)**. The High range (25–69) doesn't bind.
+- **Alternate:** suppose any interactive policy leaves the allowlist blank, the wrapper is deployed, and `/usr/local/bin` is user-owned. Then S2 is High, S3 Medium, and S5 Medium: 100 − (73 + 18) = 9, **floored at 25 → 25/100 (🟠 Poor)**.
 - **Operator baseline:**
   - Every interactive policy sets an allowlist that excludes EDR removal (S2 → High if not).
   - Every policy runs the main script, not the wrapper (S3 → Medium if not).

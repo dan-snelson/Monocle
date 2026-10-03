@@ -1,4 +1,4 @@
-# Executive View
+# 👔 Executive View
 
 ## Contents
 - Purpose
@@ -37,7 +37,7 @@ Use exactly this structure:
 - {Bullet 3}
 - {… up to 6 bullets total}
 
-**Monocle Score:** {n}/100 ({band}){, or {n2}/100 ({band2}) if {plain-language condition}}
+**Monocle Score:** {n}/100 ({band emoji} {band}){, or {n2}/100 ({band2 emoji} {band2}) if {plain-language condition}}
 
 **Recommendation:** {Approve | Approve with conditions | Hold | Do not run} — {one sentence explaining why, plus the conditions if any.}
 ```
@@ -50,7 +50,7 @@ Rules:
 - **Quantify when possible.** "All managed Macs", "about 30 seconds per device", "requires a restart", "one person maintains it".
 - **Neutral, confident tone.** Don't be alarmist, and don't hedge the point away. Use "could" only for real uncertainty.
 - **One recommendation.** Always include one. Never write "it depends" without saying on what.
-- **Monocle Score line.** Copy the score and band from the report header (SKILL.md, Step 5, Monocle Score). The first number assumes the tool is deployed as documented. Write the condition for the alternate as the administrator action it depends on, in plain language, for example "or 25/100 (Poor) if any Self Service policy offers every action". Leave the breakdown out of this view; it has its own section. The score line doesn't count toward the 1–6 bullets.
+- **Monocle Score line.** Copy the score and band from the report's Monocle Score section (SKILL.md, Step 5, Monocle Score). The first number assumes the tool is deployed as documented. Write the condition for the alternate as the administrator action it depends on, in plain language, for example "or 25/100 (🟠 Poor) if any Self Service policy offers every action". Leave the breakdown out of this view; it has its own section. The score line doesn't count toward the 1–6 bullets.
 - **Powerful features are not defects.** When the tool can do something drastic on purpose, and administrators control whether users see it, say who controls it. Don't present it as a flaw. Write "Administrators choose which actions each policy offers; unless they do, users see every action, including removing the security agent", not "The tool lets any user remove the security agent". Save risk language for what the code itself gets wrong (SKILL.md Rule 14).
 
 Recommendation levels:
@@ -120,7 +120,7 @@ Why it's weak: it describes mechanism instead of purpose, uses jargon, makes vag
 - **Needs internet and one download site to be available.** If that site is down, setup stalls for new hires on day one.
 - **Maintained by one person.** No documentation or tests exist outside their knowledge.
 
-**Monocle Score:** 32/100 (Poor)
+**Monocle Score:** 32/100 (🟠 Poor)
 
 **Recommendation:** Do not run — the password in the script gives anyone who can read it control of the whole fleet; remove it and fix the false "success" reporting before the next hiring wave.
 ```
@@ -134,7 +134,7 @@ Why it's weak: it describes mechanism instead of purpose, uses jargon, makes vag
 - **Runs in under a second, invisibly to users.**
 - **May report "unknown" on desktop Macs,** which have no battery. That's expected, not an error.
 
-**Monocle Score:** 100/100 (Excellent)
+**Monocle Score:** 100/100 (🟢 Excellent)
 
 **Recommendation:** Approve — no changes needed.
 ```
