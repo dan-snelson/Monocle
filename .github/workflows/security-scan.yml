@@ -1,8 +1,9 @@
 # Protects Monocle from common vulnerabilities with Semgrep, Gitleaks,
 # documented-command syntax checks, ShellCheck, and skill-integrity checks.
-# Monocle ships no executable scripts: its attack surface is the Markdown an
-# agent follows (monocle/SKILL.md and monocle/references/) and the commands
-# fenced inside it. Semgrep scans the full repository, including this
+# Monocle's attack surface is the Markdown an agent follows (monocle/SKILL.md
+# and monocle/references/), the commands fenced inside it, and one stdlib
+# Python script (monocle/scripts/verify_report.py) that verify mode runs.
+# Semgrep scans the full repository, including this
 # workflow, and uploads findings to GitHub code scanning when the repository
 # supports it. Gitleaks scans the full git history for potential secrets,
 # including any that post-chat-refine might copy from a target into the skill.
@@ -12,7 +13,9 @@
 # because snippets reference variables assigned in earlier steps, and
 # SC1090/SC1091 for dynamic sourcing. Skill-integrity checks block hidden
 # Unicode and HTML comments that an agent reads but a rendered view hides, and
-# keep Monocle reports and local agent settings out of version control.
+# keep Monocle reports and local agent settings out of version control. The
+# report checker's self-test runs there too, and fails when the scoring
+# numbers in README.md or references/security.md drift from SKILL.md.
 
 name: Security Scan
 
@@ -578,20 +581,27 @@ jobs:
           sys.exit(1 if failures else 0)
           PY
 
+      - name: Run Report Checker Self-Test
+        id: verifier
+        continue-on-error: true
+        shell: bash
+        run: python3 monocle/scripts/verify_report.py --self-test
+
       - name: Finalize Skill Integrity Result
         if: success() || failure()
         shell: bash
         env:
           INTEGRITY_OUTCOME: ${{ steps.integrity.outcome }}
+          VERIFIER_OUTCOME: ${{ steps.verifier.outcome }}
         run: |
           {
             echo "### Skill Integrity"
             echo
-            echo "- Coverage: hidden or bidirectional Unicode in all tracked text files, HTML comments in tracked Markdown, tracked Monocle reports, the /reports/ gitignore rule, and tracked \`.claude/settings.local.json\`."
+            echo "- Coverage: hidden or bidirectional Unicode in all tracked text files, HTML comments in tracked Markdown, tracked Monocle reports, the /reports/ gitignore rule, tracked \`.claude/settings.local.json\`, and the \`verify_report.py --self-test\` (verdict cases, manifest format, scoring-doc sync)."
             echo
           } >> "${GITHUB_STEP_SUMMARY}"
 
-          if [[ "${INTEGRITY_OUTCOME}" == "success" ]]; then
+          if [[ "${INTEGRITY_OUTCOME}" == "success" && "${VERIFIER_OUTCOME}" == "success" ]]; then
             echo "✅ Skill integrity checks passed" >> "${GITHUB_STEP_SUMMARY}"
             exit 0
           fi
