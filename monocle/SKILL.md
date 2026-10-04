@@ -1,6 +1,6 @@
 ---
 name: monocle
-description: Inspect scripts or small repos and produce four audience-specific summaries — Executive (business impact & risk), Security (threat surface & privileges), Manager (ownership & change risk), Engineer (logic & edge cases) — plus a 0–100 Monocle Score (100 = no issues). Trigger on “monocle this”, “monocle review”, “give me the executive/security/manager/engineer view”, “summarize this script for stakeholders”, or when the user pastes a GitHub URL or attaches a script/repo and asks for multi-audience analysis. Also reviews diagnostic/support bundles (zips of logs, prefs, and metadata) and the code that generates them, for example "is this bundle safe to attach to a GitHub issue?". Supports shell, Python, AppleScript, Swift helpers, and common Jamf/macOS automation scripts.
+description: Inspect scripts or small repos and produce four audience-specific summaries — Executive (business impact & risk), Security (threat surface & privileges), Manager (ownership & change risk), Engineer (logic & edge cases) — plus a 0–100 Monocle Score (100 = no issues). Trigger on “monocle this”, “monocle review”, “give me the executive/security/manager/engineer view”, “summarize this script for stakeholders”, or when the user pastes a GitHub URL or attaches a script/repo and asks for multi-audience analysis. Also reviews diagnostic/support bundles (zips of logs, prefs, and metadata) and the code that generates them, for example "is this bundle safe to attach to a GitHub issue?". Supports shell, Python, AppleScript, Swift helpers, and common Jamf/macOS automation scripts. Also verifies whether a Monocle report came from the canonical skill ("verify this Monocle report").
 ---
 
 # 🔍 Monocle
@@ -27,11 +27,13 @@ More reference files are loaded by step or by trigger, not by view:
 
 - `references/github-input.md` — safe URL handling and fetch steps for GitHub targets. Load it in Step 1 when the input is a GitHub URL.
 - `references/large-targets.md` — reading plan, coverage math, and progress notes for oversized targets. Load it when Step 2 says the target is oversized.
-- `references/patterns.md` — a quick-reference table of common risky patterns. Load it during Step 4.
+- `references/patterns.md` — a quick-reference table of common risky patterns, plus the Known Apple platform behaviors list (Rule 13). Load it during Step 4.
 - `references/semgrep.md` — the scan command, rulesets, skip accounting, and triage for the automated scan. Load it in Step 4 when semgrep is installed.
 - `references/specialized-checks.md` — bundle intake (Step 1 E) and the conditional Step 4 checks listed under **Specialized checks**. Load it when Step 1 E or Step 4 says its trigger applies.
 - `references/prior-reports.md` — how to use an earlier report on the same target. Load it in Step 5 when one exists.
 - `references/scoring-example.md` — a worked Monocle Score calculation (Step 5).
+- `references/attestation.md` — the report's attestation block and how to collect it. Load it in Step 5 item 8.
+- `references/verify-report.md` — the integrity check for an existing report, run with `scripts/verify_report.py`. Load it only when the user asks to verify a report.
 - `references/post-chat-refine.md` — the post-run self-refinement prompt. Load it only when the user accepts the offer in Step 5 item 10.
 - `references/binge-and-purge.md` — the maintenance pass that moves conditional content out of SKILL.md when it nears the single-Read cap. Load it only when the user asks to slim SKILL.md; offer it in one line when post-chat-refine leaves less than 3,000 tokens of headroom.
 
@@ -46,6 +48,7 @@ Use Monocle when the user:
 - Asks to "summarize this script for stakeholders" or for "different audiences".
 - Pastes a GitHub URL, attaches a script, or points at a local directory and wants a multi-audience analysis.
 - Points at a diagnostic or support bundle and asks whether it is safe to share, or what security concerns it raises (Step 1 E).
+- Asks whether a Monocle report is official or was weakened. Load `references/verify-report.md` and follow it instead of Steps 1–5.
 
 Produce **all four views** by default. Produce a subset only when the user explicitly asks for one ("just the security view", "exec and manager only"). When producing a subset, still do the full analysis in Steps 1–4. Findings from one view often change the conclusions of another.
 
@@ -193,7 +196,7 @@ Load `references/specialized-checks.md` when any trigger below applies, and work
 The sticky bit on these directories stops users from deleting *other people's* files. It does not stop them from creating a name first, or from replacing files they own. Check for each of these:
 
 - **Root writes to a fixed name.** `>`, `: >`, `curl -o`, `cp`, `mkdir -p`, `chmod`, and `chown` (without `-h`) all follow symlinks. A user who plants a symlink first gets root to overwrite, or change the mode or owner of, an arbitrary file. `mktemp` names are safe; fixed names are not.
-- **Root `chown`s a file to the console user.** Once the user owns a file in a sticky directory, they can delete it and put a symlink in its place. The next run's `chown`/`chmod` then hands the user ownership of the symlink's target. That is local privilege escalation. Look at write-then-`chown` helpers and at "prepare file for user" functions, including replay or cache paths that `chown` without writing.
+- **Root `chown`s a file to the console user.** Once the user owns a file in a sticky directory, they can delete it and put a symlink in its place. The next run's `chown`/`chmod` then hands the user ownership of the symlink's target. That is local privilege escalation. Look at write-then-`chown` helpers and at "prepare file for user" functions, including replay or cache paths that `chown` without writing. Root `chown -R` over any tree the user can fill (even under their home) needs no race: a planted hard link is the system file itself, and `-P` or symlink checks don't stop it (`references/specialized-checks.md`, Shared directories).
 - **Root trusts a file it didn't create.** A cache, report, trigger file, or downloaded feed that is validated only by age or syntax can be forged by a user who creates it first. Examples: compliance results uploaded to a SIEM, and OS-update feeds that decide compliance. Check whether ownership (`stat -f '%Su:%Sg'`) and `[[ -L ]]` are verified. System logs count too: `/var/log/install.log` accepts lines, sender tag included, from any local user, and unified-log process predicates don't authenticate (Rule 13, Known Apple platform behaviors). Prefer root-owned state files or APIs that expose authenticated state.
 - **Write, then execute.** Root writes a script to a fixed shared path (self-extracting wrappers, `base64 -d > /var/tmp/x.zsh; zsh /var/tmp/x.zsh`) and then runs it. A user who pre-created the file keeps ownership after root's `>` truncates it, so they can rewrite it in the gap. The gap is wider than it looks: any slow discovery (`mdfind`, `system_profiler`) before the script copies itself extends it. The wrapper generator is often a separate helper script, so read the text it generates.
 - **The fix pattern** to recommend: use a root-owned `0755` runtime directory, or `mktemp -d` per run; write atomically (`mktemp` in the same directory, then `mv -f`); never `chown` a root-written input to the user; and check ownership before trusting any cache.
@@ -210,11 +213,10 @@ Group-writable app-owned directories, and choosing a high-value target once you 
 - **Version-string gates.** A cache or self-update that compares only `scriptVersion=` never picks up edits made without a version bump. Check whether an early exit skips the reinstall step.
 - **Logs discarded.** A LaunchDaemon with `StandardOutPath`/`StandardErrorPath` set to `/dev/null` hides crashes of the persistent job.
 - **Non-production modes pollute production state.** A Test mode that marks every check `success`, or a Development mode that runs a small subset, may still write the canonical report or cache. A later production run can then upload that synthetic data as fresh. Trace mode → result recording → report write → cache validation → upload. If a metadata field records the mode, check whether the shipped dashboards or queries filter on it. Rate this at least Medium when compliance data is affected.
-- **Delivery calls without `--fail`.** `curl` POSTs to webhooks or APIs without `--fail` exit 0 on HTTP 4xx/5xx, so the log reports success.
 - **Fail-open enum parsing.** A `case` on a Jamf parameter whose `*)` branch selects the most consequential value (for example, `* ) mode="production"`) turns a typo into production behavior. Also check whether operation-mode parameters are validated at all, since a wrong-case value (`silent`) often falls through every branch.
 - **Non-production modes other than Test.** Scripts often isolate Test and Development output and forget Debug. Check each mode in the mode matrix separately.
-- **A parse fallback reads as healthy.** An ignored exit code combined with a `json.loads` failure that falls back to `{}` or `[]` turns an outage into "nothing to do", and the run reports OK. Trace what an empty result means downstream.
 - **Silent schedule failures.** A network call without a timeout in a scheduled job, an unbounded `until` poll loop (waiting for an app or file that may never appear) while the run holds a single-instance PID lock, and legacy `launchctl load` / `unload` all stop or fake a schedule without an error. See their rows in `references/patterns.md`.
+- **Also check** `curl` delivery calls without `--fail`, and parse fallbacks to `{}` or `[]` after an ignored exit code; see their rows in `references/patterns.md`.
 
 ### Secrets
 
@@ -233,7 +235,6 @@ Group-writable app-owned directories, and choosing a high-value target once you 
 
 - The console user exists and isn't `loginwindow`, `_mbsetupuser`, or `root`.
 - Specific macOS version, CPU architecture (`arm64` vs `x86_64`, Rosetta), and Homebrew prefix (`/opt/homebrew` vs `/usr/local`).
-  - A hardcoded launchd `PATH` that leaves out `/usr/local/bin` breaks Intel Homebrew. Even when the code finds `brew` by absolute path, `brew doctor` fails with "Homebrew's "bin" was not found in your PATH", so every scheduled run reports a problem.
   - Derive the prefix with `brew --prefix`, never with `Path(brew).resolve()`, which follows the Intel `brew` symlink (Rule 13, Known Apple platform behaviors).
 - `PATH` contents under Jamf and launchd (Rule 13).
 - Network reachability, proxies, and captive portals.
@@ -270,6 +271,7 @@ Before writing, check the reports directory (resolved as in item 9 below; also c
    - It records when the analysis ran, not when the code was committed; the SHA or ref covers that.
    - Never guess it from commit history or training data.
    - **Record the generating model.** Set **Generated by** to the name of the model that produced the report, plus a version or short identifier when the runtime exposes one, for example `Claude Sonnet 4.5`, `GPT-5`, `Grok 4`, or `Codex`. If the exact model string is unknown, use the best available label from the session (product name, API model id, or agent name), and never invent a version. Put it in both the Monocle Score section's **Generated by** line and the Scope table's **Generated by** row. Never omit it.
+   - **Stamp the attestation.** Load `references/attestation.md` and add its block at the end of Scope, with scores copied from the Total and Score lines.
 9. **Write the report to the reports directory.**
    - Always save the full report, whatever its length, to one central reports directory. Resolve it in this order, regardless of the current working directory or the target's location:
      1. `$MONOCLE_REPORTS_DIR`, if set.
@@ -480,11 +482,13 @@ Use this layout for the full report. Keep all headings, even when a section is s
 **Scope caveats:**
 - **{Short label}.** {One caveat per bullet: skipped files, coverage, unfetchable deps, assumptions, isolated checks, side effects. Nest bullets for line ranges and lists.}
 
+**Attestation:** {block per references/attestation.md}
+
 </details>
 
 ---
 
-[Generated by Monocle](https://github.com/dan-snelson/Monocle)
+[Generated by Monocle](https://github.com/dan-snelson/Monocle/tree/{skill_commit})
 ```
 
 Report layout:
@@ -494,7 +498,7 @@ Report layout:
 - Every `##` section except Contents wraps its body in `<details>`. The heading itself stays outside, so Contents links resolve. Every section starts collapsed (plain `<details>`, never `<details open>`); its `<summary>` carries the result.
 - Each `<summary>` is the heading text, a colon, and the section's main result, so a reader gets the score, recommendation, overall risk, and key takeaways without expanding anything. Write the result after the body is final, and keep it consistent with the body: the score, band, overall risk, and recommendation level match the body exactly. A `<summary>` carries the headline score only, not the alternate, and the recommendation level only (for example, "Approve with conditions"), never its reason sentence. Keep it to one line of about 90 characters or fewer, in plain text: no Markdown, backticks, or links, which don't render inside `<summary>`. The full body stays inside the block; the summary adds a takeaway, it doesn't replace content.
 - Leave a blank line after `</summary>` and before `</details>`. Without them, Markdown inside the block doesn't render.
-- Scope is the last `##` section. The report ends with a `---` line and the footer `[Generated by Monocle](https://github.com/dan-snelson/Monocle)`, after Scope's `</details>`, with nothing after the footer.
+- Scope is the last `##` section. Its attestation block follows the caveats. The report ends with a `---` line and the footer, pinned to `skill_commit` (the plain repository link when it is `unknown`), after Scope's `</details>`, with nothing after the footer.
 - Each Scope table cell holds one line. Don't use HTML such as `<br>`, and don't put a `|` inside a cell.
 - Anything with several parts goes in the **Scope caveats** bullet list under the table: coverage line ranges, read-directly vs pattern-scanned file lists, isolated-check evidence, side effects. Start each bullet with a bold label. When the row says "None", omit the list.
 
@@ -524,18 +528,7 @@ For a subset request, keep the Monocle Score, Contents, and Scope sections (Scop
 13. **State where each security concern comes from.** Readers fix a finding differently depending on its source, so give every Security finding one origin, or a combination:
     - **Code** — the target's own code introduces it. Changing the code fixes it.
     - **Platform** — inherent behavior of macOS, Jamf Pro, or another tool the code relies on. Example: Jamf passes policy parameters as process arguments, and macOS lets any local user read them. The code can't remove this; it can only avoid it, mitigate it, or document it.
-      - **Known Apple platform behaviors.** Check this list before naming a Platform origin, and cite the entry rather than re-deriving it. Add a new entry only after an isolated check (Rule 4), host evidence such as `ls -l` on a root-owned file, or Apple documentation.
-        - **install.log is user-writable, sender tag included.** Any local user can append to `/var/log/install.log` with `logger -p install.<level>`, and the line gets a normal syslog timestamp. `-t softwareupdated -i` produces a `softwareupdated[<pid>]:` prefix, so a sender regex on that log matches forged lines (Darwin 25). Root code that matches substrings or sender tags there trusts text any local user can write.
-        - **Unified-log process predicates aren't authentication.** `process == "softwareupdated"` narrows rows by executable name only.
-        - **DDM update state has a root-written source.** `/var/db/softwareupdate/SoftwareUpdateDDMStatePersistence.plist` (`_softwareupdate:_softwareupdate 0644`) holds `TargetOSVersion` and `TargetLocalDateTime` for active declarations. Prefer it over install.log text. Its layout and the install.log wording are undocumented Apple internals that can change between releases, so flag a parser that fails closed when they do.
-        - **DDM enforcement doesn't depend on reminder tools.** Apple installs at the declared deadline whatever a third-party reminder does. Bypassing a reminder weakens the nudge and any admin escalation (a Rule 14 gate), not the enforcement. Reflect that in the severity and the Executive wording.
-        - **Process arguments are visible to every local user.** `ps` shows each process's `argv`, so Jamf `$4`–`$11` stay readable for the whole run.
-        - **Intel `/usr/local/bin` can be user-owned.** Intel Homebrew chowns it to the installing user, who keeps ownership after being demoted to standard. Apple silicon Homebrew uses `/opt/homebrew`, leaving `/usr/local/bin` root-owned. On Intel, `/usr/local/bin/brew` is a symlink into `/usr/local/Homebrew/bin/`.
-        - **Sticky shared directories.** `/tmp`, `/var/tmp` (`1777`), and `/Users/Shared` stop users from deleting other users' files, not from creating a name first or replacing their own files.
-        - **Minimal `PATH`.** launchd jobs and Jamf policies start with a minimal `PATH`.
-        - **Bundled tools.** `python3` is no longer bundled; `/usr/bin/jq` ships only on macOS 15+.
-        - **APFS is case-insensitive by default.** `Id` resolves to `/usr/bin/id`.
-        - **Console-user placeholders.** With no one logged in, the console user reads `loginwindow`; during Setup Assistant, `_mbsetupuser`.
+      - **Known Apple platform behaviors.** Check the list in `references/patterns.md` before naming a Platform origin, and cite the entry rather than re-deriving it. Add a new entry there only after an isolated check (Rule 4), host evidence such as `ls -l` on a root-owned file, or Apple documentation.
     - **Deployment** — created or removed by how the organization configures and runs the code: parameter values, policy scope, how secrets are delivered.
 
     Put the origin in an **Origin:** line directly under **Location:**, with one sentence naming the platform behavior or configuration choice and what the code already does about it. Word the finding title, the Executive bullet, and the Manager action so a Platform or Deployment finding doesn't read as a defect in the code. Write "Jamf policy parameters expose secrets to local users", not "Script leaks the API token". The origin changes the framing and the fix, not the severity: rate the real exposure (Rule 11).

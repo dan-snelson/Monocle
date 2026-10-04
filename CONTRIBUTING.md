@@ -26,6 +26,7 @@ Skill changes should:
 - Avoid adding target-specific findings, customer names, hostnames, usernames, secrets, or run-specific values to the skill.
 - Keep `monocle/SKILL.md` focused on core workflow, and put conditional or specialized guidance in the relevant reference file.
 - Keep scoring guidance consistent across `monocle/SKILL.md`, [README.md](README.md), and [monocle/references/scoring-example.md](monocle/references/scoring-example.md).
+- `monocle/scripts/verify_report.py` parses the Step 5 **Deductions**, **Band limits**, and **Bands** tables, and the report's Output template layout. If you change their format or the attestation fields, update the script and `monocle/references/attestation.md` in the same PR, and run `python3 monocle/scripts/verify_report.py --self-test`. The self-test also fails when the scoring numbers in `README.md` or `monocle/references/security.md` drift from `SKILL.md`.
 - Keep examples sanitized and generic.
 
 ## Documentation Contributions
@@ -40,7 +41,7 @@ The security scan workflow checks:
 - Gitleaks against repository history
 - fenced `bash`, `sh`, `zsh`, and `python` blocks in tracked Markdown
 - ShellCheck for fenced `bash` and `sh` blocks
-- skill integrity, including hidden Unicode, HTML comments in Markdown, tracked reports, `/reports/` ignore coverage, and local agent settings
+- skill integrity, including hidden Unicode, HTML comments in Markdown, tracked reports, `/reports/` ignore coverage, local agent settings, and the `verify_report.py --self-test`
 
 Run the relevant local checks before opening a PR when practical. At minimum, review Markdown rendering and run `git diff --check`. If you change fenced shell or Python examples, run the same syntax checks described by the workflow.
 

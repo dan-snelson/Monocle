@@ -2,7 +2,7 @@
 
 Thank you for helping keep **Monocle** secure.
 
-Monocle is an [Agent Skill](https://agentskills.io) for Claude Code and Codex. It ships no compiled code, but its instructions direct an AI agent to read **untrusted targets** (scripts, repos, GitHub URLs, and diagnostic bundles), run local commands against them (`gh`, `curl`, `git clone`, `unzip`, `semgrep`), and write reports that contain **security findings**. On request, its **post-chat-refine** pass edits the skill's own files. The maintained attack surface is **`monocle/SKILL.md`** and everything under **`monocle/references/`**.
+Monocle is an [Agent Skill](https://agentskills.io) for Claude Code and Codex. It ships no compiled code, but its instructions direct an AI agent to read **untrusted targets** (scripts, repos, GitHub URLs, and diagnostic bundles), run local commands against them (`gh`, `curl`, `git clone`, `unzip`, `semgrep`), and write reports that contain **security findings**. On request, its **post-chat-refine** pass edits the skill's own files, and its verify mode reads an untrusted Monocle report and clones this repository to check it. The maintained attack surface is **`monocle/SKILL.md`**, everything under **`monocle/references/`**, and **`monocle/scripts/verify_report.py`**, a standard-library Python script that verify mode runs.
 
 ## Supported Versions
 
@@ -23,6 +23,7 @@ Report a vulnerability when Monocle's instructions can lead an agent to:
 - Expose secrets from a target in a report, chat reply, or skill edit without redaction
 - Write reports to an unintended location, overwrite existing files, or place reports in a git-tracked path without a warning
 - Leak target-identifying details into `SKILL.md` or `references/` through post-chat-refine
+- Make `verify_report.py` pass report text to a shell, execute fetched repository content, or return OFFICIAL for a report whose scoring rules or arithmetic differ from canonical `SKILL.md`
 
 Inaccurate findings, missed issues, and scoring disagreements are quality issues, not vulnerabilities. Open a regular issue for those.
 
@@ -67,6 +68,11 @@ You should receive an acknowledgment within **48 hours**. We will work with you 
 - Semgrep scans use `--metrics=off` and explicit `--config` rulesets, so a config file shipped in the target repo is never used (`references/semgrep.md`).
 - This repository's `.gitignore` excludes `/reports/`, and the skill checks that any reports directory inside a git repository is gitignored before writing.
 - post-chat-refine strips identifiers and runs a fingerprint check over the lines it adds (`references/post-chat-refine.md`).
+- `verify_report.py` treats the report as untrusted input:
+  - It passes only strictly validated commit hashes to `git`, as list arguments with no shell.
+  - It reads the fetched repository through git plumbing, without a checkout.
+  - Its `--self-test` runs in CI.
+  - Report attestations are self-asserted, not signed; `references/verify-report.md` states what a verdict can and can't prove.
 - Changes are reviewed with attention to shell quoting in documented commands, untrusted-input handling, report destinations, and what post-chat-refine may write.
 
 ## Disclosure Policy

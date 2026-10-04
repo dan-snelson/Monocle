@@ -16,6 +16,8 @@ Monocle is an [Agent Skill](https://agentskills.io) tuned for shell (`sh` / `bas
 ```
 monocle/
 ├── SKILL.md              # Core workflow: input detection, scoping, fact sheet, output template
+├── scripts/
+│   └── verify_report.py        # Report integrity checker (stdlib Python; see Report attestation)
 └── references/
     ├── executive.md
     ├── security.md
@@ -23,11 +25,13 @@ monocle/
     ├── engineer.md
     ├── github-input.md         # Safe URL handling and fetch steps for GitHub targets
     ├── large-targets.md        # Reading plan and coverage for oversized targets
-    ├── patterns.md             # Quick-reference table of risky Jamf/macOS/Python patterns
+    ├── patterns.md             # Quick-reference table of risky Jamf/macOS/Python patterns, plus Known Apple platform behaviors
     ├── semgrep.md              # Automated-scan command, rulesets, skip accounting, and triage
     ├── specialized-checks.md   # Bundle intake and the conditional Step 4 checks, loaded on trigger
     ├── prior-reports.md        # Using an earlier report on the same target
     ├── scoring-example.md      # Worked Monocle Score calculation
+    ├── attestation.md          # The attestation block every report carries
+    ├── verify-report.md        # Integrity check for an existing report (on request)
     ├── post-chat-refine.md     # Post-run prompt that folds a run's learnings back into the skill (on request)
     └── binge-and-purge.md      # Maintenance pass that moves conditional content out of SKILL.md (on request)
 ```
@@ -77,6 +81,7 @@ Examples:
 - `Summarize this repo for stakeholders: ~/Projects/jamf-scripts`
 - `monocle this ~/Downloads/support-bundle.zip — is it safe to attach to a GitHub issue?`
 - `$monocle just the engineer view of ./scripts/enroll.zsh` (Codex)
+- `verify this Monocle report: ~/monocle-reports/monocle-enroll.zsh-2026-01-01-0900.md`
 
 All four views are produced by default. To get a subset, ask for it: "just the executive and manager views".
 
@@ -121,5 +126,27 @@ The score rates the code, not the Mac Admin. Mac Admin tools are meant to be pow
 - **Maintainer-only tooling isn't scored.** Examples are release helpers and sync scripts. Its issues are still reported.
 
 The full rules are in `monocle/SKILL.md`, Step 5 and Rule 14.
+
+### 🔏 Report attestation
+
+Every report ends its Scope section with an attestation block. The block records:
+
+- the skill commit and branch;
+- the `monocle/` tree hash and a content hash of the skill directory;
+- whether the skill had local edits (`skill_dirty`), such as uncommitted post-chat-refine changes;
+- the target;
+- the raw, final, and alternate scores.
+
+The footer link pins the same commit.
+
+To check whether a report came from the canonical skill, or from a copy weakened to score better, ask Monocle to verify it, or run the checker directly:
+
+```zsh
+python3 monocle/scripts/verify_report.py --fetch ~/monocle-reports/monocle-enroll.zsh-2026-01-01-0900.md
+```
+
+The checker fetches this repository, confirms the attested commit and hashes, and reads the scoring tables from canonical `SKILL.md` at that commit. It then recomputes the score from the report's own findings and checks the report layout. The agent adds judgment checks, such as Rule 14 misuse and softened severities, and gives one verdict: **OFFICIAL**, **SUSPECT** (no attestation), **NON-CANONICAL / WEAKENED**, or **FORGED**.
+
+The attestation is text the model asserts about itself, not a cryptographic signature. OFFICIAL means no evidence of weakening was found. Detection rests on recomputing the score and checking the rules against this repository.
 
 🔗 Fetching from GitHub works best with an authenticated [`gh`](https://cli.github.com) CLI, which also covers private repos. In Codex, fetching from GitHub needs network access in the sandbox; if network access is off, clone the repo locally and point Monocle at the path.

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Extract fenced bash, sh, zsh, and python blocks from tracked Markdown.
 
-Monocle ships no scripts of its own; the commands an agent copies and runs
-live in fenced code blocks in SKILL.md, references/, and README.md. This
+Apart from monocle/scripts/verify_report.py, the commands an agent copies
+and runs live in fenced code blocks in SKILL.md, references/, and README.md. This
 writes each block to its own file so the security-scan workflow can syntax-
 check and lint it, and records where it came from in manifest.tsv:
 
