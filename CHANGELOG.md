@@ -4,6 +4,19 @@
 
 ## Version History
 
+### "A" as in aisle (05-Oct-2026)
+
+- Scoring consistency, so re-runs on the same code give the same Monocle Score
+    - New `references/scoring-procedure.md`, loaded on every run before any view is written: an issue ledger with stable IDs (`S#`, `N#`, `X#`) and issue keys, a distinct-issue test, a Rule 14 checklist, a non-security inclusion test with reason codes, and a mechanical Operator baseline with a single alternate
+    - Severity Decision procedure in `references/security.md`, recorded in a new **Severity basis** line on every finding. A security-relevant gap with a concrete fix is at least Low, the fleet-wide raise never reaches Critical, and Overall risk always equals the highest headline severity
+    - Step 5 "Rate and freeze": the score comes from the frozen ledger, not from view prose. Every Low or higher finding gets its own row; the roll-up holds credits and Info only
+    - Visible ledger tags: Manager and Engineer bullets end in `(N#)`, `(see S#)`, or `(not scored: …)`, and the Not scored row lists reason codes
+    - Targets within the size limits are read in full, with no pattern-scanning. New fact-sheet details cover log-file modes, exit paths, who can write executed files, and where the console user is resolved
+    - Inferred findings are kept, labeled, and rated, never dropped
+    - Prior reports are now a disposition checklist: every earlier item is Confirmed, Re-rated, Closed, or Rejected
+    - Verify mode adds ledger checks for parked Lows, roll-up Lows, missing reason codes, and missing tags
+    - The refactor-snippet check moved from `SKILL.md` to `references/engineer.md`
+
 ### "Initial Commit" (04-Oct-2026)
 
 - Initial release of Monocle, an [Agent Skill](https://agentskills.io) for Claude Code and Codex that inspects scripts, small repos (local or on GitHub), and diagnostic/support bundles
@@ -21,4 +34,3 @@
 - Report attestation block and "verify this Monocle report" mode, backed by `monocle/scripts/verify_report.py` (standard-library Python) (#6)
 - Security Scan workflow: Semgrep, Gitleaks, syntax checks and ShellCheck for documented commands, hidden-Unicode and HTML-comment blocking, and a report-checker self-test that catches scoring drift (#2, #6)
 - `CONTRIBUTING.md`, `SECURITY.md`, and GitHub issue templates for bug reports, documentation, and feature requests (#2)
-- Scoring consistency: `references/scoring-procedure.md` (issue ledger, distinct-issue test, Rule 14 checklist, non-security inclusion test with reason codes, mechanical Operator baseline), a Decision procedure in `references/security.md`, and prior reports as a disposition checklist
