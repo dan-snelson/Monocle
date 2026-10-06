@@ -68,6 +68,7 @@ The script can't judge whether findings were rated honestly. Read the Security, 
 - **Missing disclosures.** Conditional severity language ("drops to Info if …", "High if …") with no Operator baseline entry or no alternate score. An Operator baseline that assumes a control the documentation never mentions ("Undocumented controls get no credit").
 - **Consistency.** The band disagrees with the Security view's Overall risk, or the Recommendation contradicts the band (SKILL.md Step 5, Consistency).
 - **Altered template text.** Changed severity names, emoji, or band names. Missing Origin lines. Removed provenance language.
+- **Ledger checks** (reports from skill commits that include `references/scoring-procedure.md`): look for an ⚪ Info finding with a security-relevant gain and a concrete security fix (a parked Low), a Low folded into the roll-up, a Not scored item without a fitting reason code, and a Fragility, Footgun, or edge-case bullet with no `(N#)`, `(see S#)`, or `(not scored: …)` tag. Recompute with the corrected counts. A missing tag that doesn't change the score is a consistency note, not weakening.
 
 When a judgment failure changes a severity, recompute the official score with the corrected severities and the canonical tables. Show the arithmetic.
 

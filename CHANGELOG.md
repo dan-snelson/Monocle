@@ -21,3 +21,4 @@
 - Report attestation block and "verify this Monocle report" mode, backed by `monocle/scripts/verify_report.py` (standard-library Python) (#6)
 - Security Scan workflow: Semgrep, Gitleaks, syntax checks and ShellCheck for documented commands, hidden-Unicode and HTML-comment blocking, and a report-checker self-test that catches scoring drift (#2, #6)
 - `CONTRIBUTING.md`, `SECURITY.md`, and GitHub issue templates for bug reports, documentation, and feature requests (#2)
+- Scoring consistency: `references/scoring-procedure.md` (issue ledger, distinct-issue test, Rule 14 checklist, non-security inclusion test with reason codes, mechanical Operator baseline), a Decision procedure in `references/security.md`, and prior reports as a disposition checklist

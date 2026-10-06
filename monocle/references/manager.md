@@ -63,6 +63,7 @@ Rules:
 
 - **Tone:** pragmatic and operational. Write for someone planning a sprint or a change-board slot.
 - **Keep line references light.** Include them where they help someone find a problem, but lead with the operational consequence.
+- **Ledger tags:** end each fragility hotspot with `(N#)`, `(see S#)`, or `(not scored: {reason code})`, from the issue ledger (`scoring-procedure.md`).
 - **Assign an owner role to every action item** ("Mac engineer", "Security", "Jamf admin", "Service owner"), not a person's name, unless the code names an owner.
 - **Effort:** S is under 2 hours, M is under 2 days, L is more than that.
 - **Priority:** P1 means before the next run or deployment. P2 means this quarter. P3 means backlog.
@@ -139,9 +140,9 @@ Why it's weak: no evidence, no reasons, and action items without owners, effort,
 - Jamf API client in `$5`/`$6` — rotating the secret breaks the script with no error.
 
 ### Fragility hotspots
-- Detecting the console user fails during Setup Assistant (`_mbsetupuser`), so the dialog never appears — `setup.zsh:88`.
-- Assumes Apple silicon Homebrew path `/opt/homebrew` — breaks on the remaining Intel Macs — `setup.zsh:140`.
-- Log goes to `/var/tmp/setup.log`, which is overwritten on each run, so there's no history for help desk triage.
+- Detecting the console user fails during Setup Assistant (`_mbsetupuser`), so the dialog never appears — `setup.zsh:88` (N1).
+- Assumes Apple silicon Homebrew path `/opt/homebrew` — breaks on the remaining Intel Macs — `setup.zsh:140` (N2).
+- Log goes to `/var/tmp/setup.log`, which is overwritten on each run, so there's no history for help desk triage (not scored: immaterial).
 
 ### Change & rollback
 - **Testing:** None found. No test harness and no dry-run mode.

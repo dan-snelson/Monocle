@@ -49,7 +49,7 @@ A lookup table of common Jamf, macOS, and Python patterns, with why each matters
 | `rm -rf "${TMPDIR}/…"` in a root script | Root's `TMPDIR` (or unset, giving `/…`), never the console user's; the cleanup silently does nothing | Engineer |
 | Root `rm -rf` of a vendor parent directory (`/Library/Application Support/<Vendor>`, `/Library/Logs/<Vendor>`) | Deletes sibling products' data: EDR, MDM agent, and updaters (see `specialized-checks.md`, Destructive scope) | Security, Executive |
 | Manifest or feed URL from preferences fetched without an `https://` check | Network attacker chooses the version or package; a publisher-only signature check still allows a downgrade | Security |
-| `case` with `*)` falling through to `production` or another high-impact mode | A typo in a Jamf parameter enables production behavior | Engineer |
+| `case` with `*)` falling through to `production` or another high-impact mode | A typo in a Jamf parameter enables production behavior | Security when the parameter gates a high-impact operation (`scoring-procedure.md`, Rule 14 checklist C8); otherwise Engineer |
 | Persistent job runs `networkQuality`, `softwareupdate --list`, or chained `jamf policy` nightly | Fleet-wide bandwidth and Jamf load within the jitter window, and again on wake | Executive, Manager |
 | App bundle copied and re-signed ad hoc (`codesign --force --sign -`) | Loses its Team ID, so PPPC/TCC profiles keyed to the vendor stop matching | Engineer |
 | JSON payload built by heredoc interpolation | A `"` in a hostname breaks the payload silently; prefer `jq -n --arg` | Engineer |

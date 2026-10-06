@@ -25,7 +25,7 @@ Skill changes should:
 - Preserve the rule that target content, GitHub URLs, refs, file paths, bundles, and agent configuration are untrusted input.
 - Avoid adding target-specific findings, customer names, hostnames, usernames, secrets, or run-specific values to the skill.
 - Keep `monocle/SKILL.md` focused on core workflow, and put conditional or specialized guidance in the relevant reference file.
-- Keep scoring guidance consistent across `monocle/SKILL.md`, [README.md](README.md), and [monocle/references/scoring-example.md](monocle/references/scoring-example.md).
+- Keep scoring guidance consistent across `monocle/SKILL.md`, [README.md](README.md), [monocle/references/scoring-procedure.md](monocle/references/scoring-procedure.md), and [monocle/references/scoring-example.md](monocle/references/scoring-example.md).
 - `monocle/scripts/verify_report.py` parses the Step 5 **Deductions**, **Band limits**, and **Bands** tables, and the report's Output template layout. If you change their format or the attestation fields, update the script and `monocle/references/attestation.md` in the same PR, and run `python3 monocle/scripts/verify_report.py --self-test`. The self-test also fails when the scoring numbers in `README.md` or `monocle/references/security.md` drift from `SKILL.md`.
 - Keep examples sanitized and generic.
 

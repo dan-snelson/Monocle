@@ -5,6 +5,7 @@
 - Structure and tone
 - Key questions the summary must answer
 - Severity scale
+  - Decision procedure
   - Credential severity
 - Good vs weak examples
   - Weak finding
@@ -53,6 +54,7 @@ Use exactly this structure:
 #### S1 — {Title}  ·  **{severity emoji} {Severity}**
 - **Location:** `file:line` (or function name)
 - **Origin:** {Code | Platform | Deployment, or a combination} — {one sentence: the platform behavior or configuration choice involved, and what the code already does about it} (see SKILL.md Rule 13)
+- **Severity basis:** {path through the Decision procedure, e.g. "Q2: a local user gets root code execution; Q3: the documented baseline closes the precondition → Low; alternate High"}
 - **Evidence:** `{short code quote, secrets redacted}`
 - **Impact:** {What an attacker or failure can achieve, and against what}
 - **Fix:** {Specific change — command, flag, or pattern to use instead}
@@ -78,8 +80,8 @@ Use exactly this structure:
 Rules:
 
 - **Tone:** factual and technical. Don't use "catastrophic" or other hype. Let the severity carry the weight.
-- **Rank findings by severity,** then by exploitability within the same severity.
-- **Cap the list at about 10 findings.** Merge closely related ones. Put nitpicks in a single "Low / Info" roll-up bullet if they're worth mentioning at all.
+- **Order findings by severity,** then by first `file:line` (`scoring-procedure.md`, Issue ledger).
+- **Give every Low or higher finding its own row and `S#`.** Merge only under the distinct-issue test (`scoring-procedure.md`). The "Low / Info" roll-up holds credits and Info observations only. Past about 10 findings, keep the extra Low write-ups to Location, Evidence, and Fix.
 - **Quote evidence verbatim,** with secrets redacted to the first 4 characters plus `…`.
 - **Make fixes concrete.** "Use `curl --fail --proto '=https' --tlsv1.2`" is a fix. "Improve TLS handling" is not.
 - If nothing notable is found, still fill in the sections and write "No Critical, High, or Medium findings", with a short reason.
@@ -108,18 +110,39 @@ Assign exactly one severity to each finding. Base it on **impact × reachability
 | 🔴 **Critical** | Remote or unauthenticated code execution as root, **or** a plaintext credential that grants write/admin access to a fleet-wide system and is hardcoded in the code, repo, or shipped payload (see **Credential severity**), **or** deliberate disabling of a core security control on many devices | `curl http://… \| sudo bash`; Jamf API admin creds hardcoded; `spctl --master-disable` fleet-wide |
 | 🟠 **High** | Local privilege escalation to root; code injection from an attacker-influenced input; a secret with meaningful scope exposed in logs, the process list, or a world-readable file; TLS verification disabled on a download that gets executed; unverifiable (obfuscated) behavior | `eval "$4"`; root reads and executes `~/Library/…/script.sh`; `curl -k` then run; `curl -u admin:pass` visible in `ps` |
 | 🟡 **Medium** | Exploitable only with local access plus timing, or the impact is limited to one user or device; weak integrity checks; overly broad permissions | Predictable `/tmp/foo` written as root; `chmod 777`; downloaded pkg installed without a signature/Team ID check; narrow or read-only credential in a Jamf param (see **Credential severity**) |
-| 🔵 **Low** | Defense-in-depth gaps with no clear exploit path | Missing `umask`; verbose logging of non-secret identifiers; no `--proto '=https'` on an HTTPS URL |
-| ⚪ **Info** | Observations useful for context, not risk | Uses `launchctl asuser` correctly; TLS pinned; runs read-only |
+| 🔵 **Low** | Defense-in-depth gaps with no clear exploit path | Missing `umask` (a root-written file left to the default mode that captures other programs' output); verbose logging of non-secret identifiers; no `--proto '=https'` on an HTTPS URL |
+| ⚪ **Info** | Observations useful for context, not risk | Uses `launchctl asuser` correctly; TLS pinned; runs read-only; a readable log holding only data local users can already read |
 
-Adjust severity for context:
+### Decision procedure
 
-- **Raise** it one level when the code runs fleet-wide by default (a Jamf policy scoped to All Computers, or a pkg in the enrollment prestage). This doesn't apply to credential findings (see **Credential severity**).
-- **Lower** it one level when the vulnerable path requires admin access that already implies equivalent power. Say so explicitly.
-- Rate **silent failures in security controls** at least Medium. Examples: a FileVault enforcement script that exits 0 on error, or a firewall-enable step whose failure is swallowed.
-- **Don't rate intended capabilities.** A documented, admin-gated destructive operation (EDR removal, data deletion, app removal) is not a finding (SKILL.md Rule 14). A blank-parameter default that offers everything is a Low secure-default gap, with the misconfigured severity as the alternate. A gate that a non-admin can bypass, or that the code defeats, is rated on its real exposure.
-- **Rate Deployment-origin exposure at the documented baseline** in the headline, and give the misconfigured severity as the alternate (SKILL.md Rule 11). When the code offers no safe way to deploy, the exposure stays in the headline.
+Answer these questions in order for each ledger row (`scoring-procedure.md`) before you choose a severity, and record the path in the finding's **Severity basis** line. The first question that decides ends the walk; then apply **Adjustments**.
 
-Overall risk equals the highest finding severity at the documented-deployment baseline, unless you justify otherwise in one sentence. When it depends on deployment, give it both ways.
+- **Q0 — Capability?** If the row is about a high-impact operation *being available* (EDR removal, data deletion, app removal), run the Rule 14 checklist in `scoring-procedure.md` and use its outcome (SKILL.md Rule 14). Defects in how the code performs the operation skip Q0.
+- **Q1 — Credential?** Use **Credential severity** below. Its result is final; adjustments don't apply.
+- **Q1b — Floors.** A silent failure in a security or compliance control is at least 🟡 Medium, for example a FileVault enforcement script that exits 0 on error, or a firewall-enable step whose failure is swallowed. So is non-production data that reaches production compliance records.
+- **Q2 — Gain.** Name the attacker (a non-admin local user, a network attacker, or a remote party), the precondition, and the gain.
+  - ⚪ **Info** applies only when the gain isn't security-relevant even with the precondition met: something cosmetic, the availability of a non-security feature, or data the attacker can already read. Credits and observations are also Info.
+  - Otherwise the row is at least 🔵 Low. A security-relevant gap with a concrete code fix is never Info.
+  - Rate disclosure by what the code itself writes. Treat relayed output of other programs as unknown content: 🔵 Low at most, and never assume it holds a specific secret.
+  - If only an admin can trigger the gap, rate it here as if a non-admin could, then apply the lowering adjustment.
+- **Q3 — Baseline.** Rate Deployment-origin exposure at the documented-deployment baseline (SKILL.md Rule 11).
+  - If the documented deployment never runs the vulnerable code (an undeployed file, or a parameter the documentation leaves blank), the headline is ⚪ Info.
+  - If the deployment runs the code but closes the precondition, the headline is 🔵 Low, and the walk ends.
+  - In both cases, the alternate is what Q4–Q5 give with the precondition met. When the code offers no safe way to deploy, the exposure stays in the headline.
+- **Q4 — Example match.** If a Typical examples cell in the table above matches the scenario that remains after Q3, use that row.
+- **Q5 — Criteria.** Otherwise, test the Critical, High, and Medium criteria in that order; the first match wins. If none matches, the row is 🔵 Low.
+
+**Definitions:**
+
+- **Weak integrity check (Medium):** a check an attacker can pass without the pinned vendor's signing key. Examples: a name-only signature check, a hash fetched over the same channel as the file, or no check at all. When the code pins the vendor's identity, a missing Gatekeeper, notarization, or revocation verdict is 🔵 Low.
+- **Inferred rows:** when the code path that depends on a third-party behavior is observed, rate the behavior as if it holds and label the row inferred (SKILL.md Rule 3). Never drop or downgrade a row because it is inferred.
+
+**Adjustments.** Apply these after the walk, in this order and at most once each, and name each one in the Severity basis line. Neither applies to credential findings (see **Credential severity**).
+
+1. **Raise one level** when the target's own documentation or packaging deploys it fleet-wide by default, for example a pkg in the enrollment prestage, an Extension Attribute, a LaunchDaemon on every Mac, or a Jamf policy scoped to All Computers. Never raise into 🔴 Critical: only the Critical criteria give Critical.
+2. **Lower one level** when the vulnerable path requires admin access that already implies equivalent power. Say so explicitly.
+
+Overall risk equals the highest headline severity. When the alternate's highest severity differs, give it too.
 
 Severities drive the Monocle Score (SKILL.md, Step 5, Monocle Score): Critical −40, High −20, Medium −8, Low −3, Info 0. The highest severity also sets the score's range (Critical 0–39, High 25–69, Medium 50–89, otherwise 70–100). Info findings are observations and cost nothing. Rate each finding on its merits, never to reach a target score.
 

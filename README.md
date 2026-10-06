@@ -29,6 +29,7 @@ monocle/
     ├── semgrep.md              # Automated-scan command, rulesets, skip accounting, and triage
     ├── specialized-checks.md   # Bundle intake and the conditional Step 4 checks, loaded on trigger
     ├── prior-reports.md        # Using an earlier report on the same target
+    ├── scoring-procedure.md    # Issue ledger, distinct-issue test, Rule 14 checklist, and non-security reason codes
     ├── scoring-example.md      # Worked Monocle Score calculation
     ├── attestation.md          # The attestation block every report carries
     ├── verify-report.md        # Integrity check for an existing report (on request)
@@ -121,9 +122,10 @@ The most severe finding sets the range the score must land in, in both direction
 
 The score rates the code, not the Mac Admin. Mac Admin tools are meant to be powerful, and deploying them carefully is the admin's job:
 
-- **Capabilities aren't defects.** A documented operation behind an admin-controlled gate (a Jamf parameter, policy scope, a confirmation dialog) isn't scored, even if it removes an EDR agent or deletes data. It counts only when the gate can be bypassed, fails open, or is defeated by the code. A blank-parameter default that offers everything counts as one Low finding.
+- **Capabilities aren't defects.** A documented operation behind an admin-controlled gate (a Jamf parameter, policy scope, an allowlist, an operation mode) isn't scored, even if it removes an EDR agent or deletes data. It counts only when the gate can be bypassed, fails open, or is defeated by the code. A blank-parameter default that offers everything counts as one Low finding.
 - **Documented-deployment headline.** When a severity depends on deployment, the headline assumes the tool is deployed as documented. The misconfigured score is given as the alternate, and the report lists each assumption as an **Operator baseline** checklist. If the code offers no safe way to deploy, the exposure counts in the headline.
 - **Maintainer-only tooling isn't scored.** Examples are release helpers and sync scripts. Its issues are still reported.
+- **Fixed scoring procedure.** Every issue goes through one ledger, with a severity decision procedure, a distinct-issue test, a Rule 14 checklist, and reason codes for anything not scored, so re-runs of the same code give the same score.
 
 The full rules are in `monocle/SKILL.md`, Step 5 and Rule 14.
 
