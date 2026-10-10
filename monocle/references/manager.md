@@ -63,9 +63,11 @@ Rules:
 
 - **Tone:** pragmatic and operational. Write for someone planning a sprint or a change-board slot.
 - **Keep line references light.** Include them where they help someone find a problem, but lead with the operational consequence.
+- **Ledger tags:** end each fragility hotspot with `(N#)`, `(see S#)`, or `(not scored: {reason code})`, from the issue ledger (`scoring-procedure.md`).
 - **Assign an owner role to every action item** ("Mac engineer", "Security", "Jamf admin", "Service owner"), not a person's name, unless the code names an owner.
 - **Effort:** S is under 2 hours, M is under 2 days, L is more than that.
 - **Priority:** P1 means before the next run or deployment. P2 means this quarter. P3 means backlog.
+- **Deployment context:** when the operator supplied one, list "The stated deployment model — re-run Monocle if it changes" under **What it depends on**.
 - **List up to 8 action items.** Include every Critical and High item from the Security view as a P1 action. Don't invent work for a clean script; if nothing needs doing, write "No action required." in place of the table (SKILL.md Rule 7).
 
 ---
@@ -73,7 +75,7 @@ Rules:
 ## Key questions the summary must answer
 
 1. **Who owns this?** Look for author headers, `CODEOWNERS`, and commit history. Note bus factor: if 90% or more of commits come from one author, say so.
-2. **Is it actively maintained?** Last commit date, version string, changelog, and open TODOs/FIXMEs.
+2. **Is it actively maintained?** Last commit date, version string, changelog, and open TODOs/FIXMEs. Compare the analyzed ref with the latest release tag (`git describe --tags`, or an `[Unreleased]` changelog section): fixes credited after the tag haven't reached installed copies, so say so under **What it depends on** and in the Executive view.
 3. **What does it depend on?** External binaries, remote URLs, APIs, Jamf objects (policies, EAs, smart groups), OS versions, and specific people.
 4. **What breaks it?** OS upgrades, a vendor URL change, credential rotation, a missing dependency, network changes, or renamed Jamf objects.
 5. **How would we know it broke?** Logging, exit codes, alerts, or nothing.
@@ -106,6 +108,7 @@ Rules:
 - **P1:** Security Critical/High fixes; anything that causes silent failure in a security or compliance control; missing rollback for destructive operations.
 - **P2:** Fragility that will break on a known upcoming event (OS release, credential rotation, vendor deprecation); missing logging or monitoring.
 - **P3:** Documentation, refactors, tests, and style.
+- **Mitigated by deployment context:** a finding the operator's Deployment Context mitigates keeps its action item, at P3 at most, marked "(mitigated by deployment context)". The fix still matters to every adopter outside that deployment (`deployment-context.md`).
 
 ---
 
@@ -139,9 +142,9 @@ Why it's weak: no evidence, no reasons, and action items without owners, effort,
 - Jamf API client in `$5`/`$6` — rotating the secret breaks the script with no error.
 
 ### Fragility hotspots
-- Detecting the console user fails during Setup Assistant (`_mbsetupuser`), so the dialog never appears — `setup.zsh:88`.
-- Assumes Apple silicon Homebrew path `/opt/homebrew` — breaks on the remaining Intel Macs — `setup.zsh:140`.
-- Log goes to `/var/tmp/setup.log`, which is overwritten on each run, so there's no history for help desk triage.
+- Detecting the console user fails during Setup Assistant (`_mbsetupuser`), so the dialog never appears — `setup.zsh:88` (N1).
+- Assumes Apple silicon Homebrew path `/opt/homebrew` — breaks on the remaining Intel Macs — `setup.zsh:140` (N2).
+- Log goes to `/var/tmp/setup.log`, which is overwritten on each run, so there's no history for help desk triage (not scored: immaterial).
 
 ### Change & rollback
 - **Testing:** None found. No test harness and no dry-run mode.

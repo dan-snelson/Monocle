@@ -73,6 +73,8 @@ Rules:
 - **Refactors:** give up to 6 suggestions, each with a concrete benefit tied to a footgun, finding, or edge case. If none are justified, write "No refactors warranted." (SKILL.md Rule 7). Keep before/after snippets minimal: the changed lines plus 1–2 lines of context. Make sure they're syntactically valid for the dialect.
 - **Use line references wherever you can.** If lines aren't reliable (for example, pasted snippets), use `function_name()` or a short quoted snippet.
 - **Don't restate the Security view's findings in full.** Reference them ("see S2") and focus on the code-level fix.
+- **Ledger tags:** end each footgun and edge case with `(N#)`, `(see S#)`, or `(not scored: {reason code})`, from the issue ledger (`scoring-procedure.md`).
+- **Check refactor snippets as well as citations** (extends SKILL.md Step 5 item 7). Test each "after" snippet against every platform variant the target supports: Apple silicon and Intel Homebrew prefixes, zsh and bash, and the oldest supported interpreter as well as the current one. Snippets that derive paths or parse tool output are wrong most often. For example, `Path(brew).resolve()` gives the wrong prefix on Intel.
 
 ---
 
@@ -122,15 +124,15 @@ Why it's weak: no locations, no trigger conditions, no concrete change.
 
 ~~~markdown
 ### Footguns
-- **Empty-var `rm -rf`** — `cleanup.zsh:42` — `rm -rf ${targetDir}/*`. If `$4` is blank, `targetDir` is empty and this expands to `rm -rf /*` as root.
-- **Pipeline hides failure** — `cleanup.zsh:61` — `curl -s "$url" | tar -xz -C "$dest"`. Without `pipefail`, a failed download extracts nothing and the script continues as if it succeeded.
-- **Wrong GUI context** — `notify.zsh:18` — `sudo -u "$user" osascript -e 'display dialog …'`. This runs outside the user's Aqua session, so the dialog never appears and `osascript` returns an error that is then ignored.
-- **Subshell variable loss** — `inventory.sh:33–40` — `cat list | while read -r app; do count=$((count+1)); done`. In bash, `count` is 0 after the loop because the pipe runs the loop in a subshell. (zsh runs the last pipeline element in the current shell, so this works there. The `#!/bin/bash` shebang makes it a bug.)
+- **Empty-var `rm -rf`** — `cleanup.zsh:42` — `rm -rf ${targetDir}/*`. If `$4` is blank, `targetDir` is empty and this expands to `rm -rf /*` as root (see S1).
+- **Pipeline hides failure** — `cleanup.zsh:61` — `curl -s "$url" | tar -xz -C "$dest"`. Without `pipefail`, a failed download extracts nothing and the script continues as if it succeeded (N1).
+- **Wrong GUI context** — `notify.zsh:18` — `sudo -u "$user" osascript -e 'display dialog …'`. This runs outside the user's Aqua session, so the dialog never appears and `osascript` returns an error that is then ignored (N2).
+- **Subshell variable loss** — `inventory.sh:33–40` — `cat list | while read -r app; do count=$((count+1)); done`. In bash, `count` is 0 after the loop because the pipe runs the loop in a subshell. (zsh runs the last pipeline element in the current shell, so this works there. The `#!/bin/bash` shebang makes it a bug.) (N3)
 
 ### Edge cases not handled
-- Console user is `loginwindow` (no one logged in) → `defaults write` targets `/Users/loginwindow/…`, which doesn't exist — `setup.zsh:22`.
-- App path contains a space (`/Applications/Microsoft Word.app`) → unquoted `$appPath` splits into two arguments — `check.sh:15`.
-- Second run after a partial failure → `mkdir /Library/Org` fails because the directory exists; the error is ignored, but the `cp` that follows overwrites the config without a backup — `install.zsh:70–72`.
+- Console user is `loginwindow` (no one logged in) → `defaults write` targets `/Users/loginwindow/…`, which doesn't exist — `setup.zsh:22` (N4).
+- App path contains a space (`/Applications/Microsoft Word.app`) → unquoted `$appPath` splits into two arguments — `check.sh:15` (N5).
+- Second run after a partial failure → `mkdir /Library/Org` fails because the directory exists; the error is ignored, but the `cp` that follows overwrites the config without a backup — `install.zsh:70–72` (N6).
 
 ### Refactor suggestions
 #### R1 — Guard destructive paths  ·  Quick win

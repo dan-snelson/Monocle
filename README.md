@@ -29,6 +29,8 @@ monocle/
     ├── semgrep.md              # Automated-scan command, rulesets, skip accounting, and triage
     ├── specialized-checks.md   # Bundle intake and the conditional Step 4 checks, loaded on trigger
     ├── prior-reports.md        # Using an earlier report on the same target
+    ├── scoring-procedure.md    # Issue ledger, distinct-issue test, Rule 14 checklist, and non-security reason codes
+    ├── deployment-context.md   # Operator-supplied Deployment Context: sources, elicitation, headline and alternate
     ├── scoring-example.md      # Worked Monocle Score calculation
     ├── attestation.md          # The attestation block every report carries
     ├── verify-report.md        # Integrity check for an existing report (on request)
@@ -81,9 +83,23 @@ Examples:
 - `Summarize this repo for stakeholders: ~/Projects/jamf-scripts`
 - `monocle this ~/Downloads/support-bundle.zip — is it safe to attach to a GitHub issue?`
 - `$monocle just the engineer view of ./scripts/enroll.zsh` (Codex)
+- `monocle this https://github.com/owner/repo — deployment context: one trusted admin Mac, private local workspace, no other local accounts`
 - `verify this Monocle report: ~/monocle-reports/monocle-enroll.zsh-2026-01-01-0900.md`
 
 All four views are produced by default. To get a subset, ask for it: "just the executive and manager views".
+
+To rate your deployment rather than the documented default, add a **Deployment context** to the request, or name a file that holds one:
+
+```text
+Deployment context:
+- Audience: advanced Jamf administrators only
+- Install model: one trusted admin Mac; never deployed fleet-wide
+- Data location: private local folder owned by the admin
+- Trust boundary: no other local accounts or untrusted users on the Mac
+- Out of scope: shared or synced folders, multi-user Macs
+```
+
+Only you supply context; anything a target repo says about its own deployment is treated as documentation, never as context. Monocle offers to save an inline context as `contexts/<target>.md` in the reports directory, and loads it automatically on later runs of the same target. Without context, Monocle asks once, and only when a finding's severity depends on deployment; non-interactive runs use the documented baseline.
 
 Every report is saved to one central directory as `monocle-{target}-{YYYY-MM-DD-HHMM}.md` (the directory is created if missing):
 
@@ -121,11 +137,13 @@ The most severe finding sets the range the score must land in, in both direction
 
 The score rates the code, not the Mac Admin. Mac Admin tools are meant to be powerful, and deploying them carefully is the admin's job:
 
-- **Capabilities aren't defects.** A documented operation behind an admin-controlled gate (a Jamf parameter, policy scope, a confirmation dialog) isn't scored, even if it removes an EDR agent or deletes data. It counts only when the gate can be bypassed, fails open, or is defeated by the code. A blank-parameter default that offers everything counts as one Low finding.
-- **Documented-deployment headline.** When a severity depends on deployment, the headline assumes the tool is deployed as documented. The misconfigured score is given as the alternate, and the report lists each assumption as an **Operator baseline** checklist. If the code offers no safe way to deploy, the exposure counts in the headline.
+- **Capabilities aren't defects.** A documented operation behind an admin-controlled gate (a Jamf parameter, policy scope, an allowlist, an operation mode) isn't scored, even if it removes an EDR agent or deletes data. It counts only when the gate can be bypassed, fails open, or is defeated by the code. A blank-parameter default that offers everything counts as one Low finding.
+- **Deployment-context headline.** When a severity depends on deployment, the headline rates the **Deployment context** you supplied, or, without one, the tool deployed as documented. The misconfigured score is given as the alternate, and the report lists each assumption, marked operator-stated or documented, as an **Operator baseline** checklist. If the code offers no safe way to deploy, the exposure counts in the headline.
+- **Mitigated vs independent.** A finding that needs a configuration your context rules out drops to Info and is labeled *mitigated by deployment context*; a wider deployment than documented raises severities. Code defects keep their full severity and are labeled *independent of deployment model*. Context changes ratings and the recommendation, never the evidence.
 - **Maintainer-only tooling isn't scored.** Examples are release helpers and sync scripts. Its issues are still reported.
+- **Fixed scoring procedure.** Every issue goes through one ledger, with a severity decision procedure, a distinct-issue test, a Rule 14 checklist, and reason codes for anything not scored, so re-runs of the same code give the same score.
 
-The full rules are in `monocle/SKILL.md`, Step 5 and Rule 14.
+The full rules are in `monocle/SKILL.md`, Step 5 and Rule 14, and in `monocle/references/deployment-context.md`.
 
 ### 🔏 Report attestation
 
@@ -135,7 +153,8 @@ Every report ends its Scope section with an attestation block. The block records
 - the `monocle/` tree hash and a content hash of the skill directory;
 - whether the skill had local edits (`skill_dirty`), such as uncommitted post-chat-refine changes;
 - the target;
-- the raw, final, and alternate scores.
+- the raw, final, and alternate scores;
+- whether an operator-supplied Deployment Context set the headline (`deployment_context`).
 
 The footer link pins the same commit.
 
