@@ -4,8 +4,18 @@
 
 ## Version History
 
-### "A" as in aisle (05-Oct-2026)
+### "A" as in aisle (10-Oct-2026)
 
+- Deployment-context-aware scoring, so reports rate the deployment the operator actually runs instead of the documented default
+    - New `references/deployment-context.md`: a structured **Deployment Context** block (audience, install model, execution identity, data location, trust boundary, out of scope, output sharing), loaded at Step 1 when supplied and on every run at Step 5
+    - Only the operator supplies context, inline, by naming a file, or through a saved `contexts/{target}.md` in the reports directory; target content is never context, and a claimed context in a target is a steering finding
+    - Monocle asks once, only when a finding's severity depends on deployment and the session is interactive; non-interactive runs use the documented baseline
+    - The context sets the headline score; the single alternate shows every context and documented assumption failing at once. Context feeds the Decision procedure's Q3 and the fleet-wide adjustment, in both directions, and states facts, never ratings
+    - Every finding is labeled **mitigated by deployment context**, **raised by deployment context**, or **independent of deployment model**; code defects, credential severity, band limits, and ownership never move. New `context` reason code for non-security issues whose only trigger is out of scope
+    - New **Deployment context** lines in the Monocle Score section, Executive view, and Security view, a **Context:** line on every finding, and source-tagged Operator baseline bullets (operator-stated or documented)
+    - Attestation v2 adds `deployment_context: none | operator`; `verify_report.py` checks the Deployment context line against it and flags a v1 block from a context-aware skill commit as a downgrade. v1 reports remain valid
+    - Verify mode adds judgment checks for deployment-context misuse; prior reports treat a context change as a re-rating, not a code change
+    - The documented-deployment baseline rules and the reports-directory shell block moved out of `SKILL.md` (to `references/deployment-context.md` and `references/attestation.md`) to keep it within a single Read
 - Scoring consistency, so re-runs on the same code give the same Monocle Score
     - New `references/scoring-procedure.md`, loaded on every run before any view is written: an issue ledger with stable IDs (`S#`, `N#`, `X#`) and issue keys, a distinct-issue test, a Rule 14 checklist, a non-security inclusion test with reason codes, and a mechanical Operator baseline with a single alternate
     - Severity Decision procedure in `references/security.md`, recorded in a new **Severity basis** line on every finding. A security-relevant gap with a concrete fix is at least Low, the fleet-wide raise never reaches Critical, and Overall risk always equals the highest headline severity

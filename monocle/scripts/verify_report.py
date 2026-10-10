@@ -60,6 +60,12 @@ ATTESTATION_KEYS = (
     "skill_sha256", "skill_dirty", "target", "target_ref", "score_raw",
     "score_final", "score_alt", "band", "generated_by", "timestamp",
 )
+# v2 adds deployment_context; v1 blocks come from skill commits before references/deployment-context.md.
+ATTESTATION_VERSIONS = ("v1", "v2")
+ATTESTATION_KEYS_V2 = ATTESTATION_KEYS + ("deployment_context",)
+CONTEXT_REFERENCE = "monocle/references/deployment-context.md"
+CONTEXT_LINE = "**Deployment context:**"
+CONTEXT_LABELS = {"Operator-stated": "operator", "None supplied": "none"}
 COMMIT_RE = re.compile(r"^[0-9a-f]{7,40}$")
 TREE_RE = re.compile(r"^[0-9a-f]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -395,12 +401,14 @@ def check_attestation(audit, report):
         audit.add("attestation", "present", False, "no `monocle_attestation:` block; the report can't be considered official")
         return
     audit.attestation = values
-    missing = [key for key in ATTESTATION_KEYS if key not in values]
+    version = values.get("monocle_attestation")
+    keys = ATTESTATION_KEYS_V2 if version == "v2" else ATTESTATION_KEYS
+    missing = [key for key in keys if key not in values]
     audit.add("attestation", "complete", not missing, f"missing fields: {', '.join(missing) or 'none'}")
     audit.add("attestation", "single block", len(starts) == 1 and not duplicates,
               f"{len(starts)} attestation block(s); repeated fields: {', '.join(duplicates) or 'none'}")
-    audit.add("attestation", "version", values.get("monocle_attestation") == "v1",
-              f"monocle_attestation: {values.get('monocle_attestation')!r} (expected v1)")
+    audit.add("attestation", "version", version in ATTESTATION_VERSIONS,
+              f"monocle_attestation: {version!r} (expected {' or '.join(ATTESTATION_VERSIONS)})")
 
     formats = {
         "skill_commit": lambda v: v == "unknown" or COMMIT_RE.match(v),
@@ -410,6 +418,7 @@ def check_attestation(audit, report):
         "score_raw": lambda v: to_int(v) is not None,
         "score_final": lambda v: to_int(v) is not None and 0 <= to_int(v) <= 100,
         "score_alt": lambda v: v == "none" or (to_int(v) is not None and 0 <= to_int(v) <= 100),
+        "deployment_context": lambda v: v in CONTEXT_LABELS.values(),
     }
     bad = [f"{key}={values[key]!r}" for key, test in formats.items() if key in values and not test(values[key])]
     audit.add("attestation", "field formats", not bad, f"malformed: {', '.join(bad) or 'none'}")
@@ -435,6 +444,19 @@ def check_attestation(audit, report):
                       f"attestation {values[key]!r}; Scope {field_name} {scope[field_name]!r}", warn_only=True)
 
 
+def check_context_line(audit, body, attested):
+    """A v2 report shows its Deployment Context, and the line agrees with the attestation."""
+    line = next((line for line in body if line.startswith(CONTEXT_LINE)), None)
+    audit.add("structure", "Deployment context line", line is not None,
+              f"`{CONTEXT_LINE}` line {'present' if line else 'missing'} in the Monocle Score section")
+    if line is None:
+        return
+    text = line[len(CONTEXT_LINE):].strip()
+    shown = next((value for label_text, value in CONTEXT_LABELS.items() if text.startswith(label_text)), None)
+    audit.add("structure", "Deployment context matches attestation", shown == attested,
+              f"line reads {text[:60]!r}; attestation deployment_context is {attested!r}")
+
+
 def check_steering(audit, report):
     # Fenced blocks count too: a quoted "snippet" is an easy place to hide an instruction.
     hits = [line.strip()[:120] for line in report.lines if STEERING_RE.search(line)]
@@ -452,6 +474,9 @@ def check_score(audit, report, rules):
         present = any(line.startswith(prefix) for line in body)
         audit.add("structure", f"{prefix.strip('*:')} line", present,
                   f"`{prefix}` line {'present' if present else 'missing'} in the Monocle Score section")
+    att = audit.attestation or {}
+    if att.get("monocle_attestation") == "v2":
+        check_context_line(audit, body, att.get("deployment_context"))
 
     table = report.table("Monocle Score", ("source", "ids", "count", "each", "deduction"))
     if table is None:
@@ -570,7 +595,6 @@ def check_score(audit, report, rules):
     for where, found in shown.items():
         audit.add("arithmetic", f"{where} score", bool(found) and int(found.group(1)) == final,
                   f"{where} shows {found.group(0) if found else 'no score'}; Total gives {final}/100")
-    att = audit.attestation or {}
     if att:
         audit.add("arithmetic", "attested final", to_int(att.get("score_final")) == final,
                   f"attestation score_final {att.get('score_final')}; Total gives {final}")
@@ -587,6 +611,9 @@ def check_score(audit, report, rules):
                   f"alternate {alt} is {rules.band(alt)} under canonical bands; report says {alt_band}")
         audit.add("arithmetic", "alternate direction", alt <= final,
                   f"alternate {alt} is above the headline {final}; a misconfigured case shouldn't score higher", warn_only=True)
+    elif att.get("deployment_context") == "operator":
+        audit.note("structure", "context alternate", "warn",
+                   "operator-stated context but no alternate score; valid only if the context changed no rating")
 
     # What canonical rules give for the findings this report lists. Taking the larger
     # count per severity means findings dropped from the table are still charged.
@@ -709,12 +736,24 @@ def check_provenance(audit, git, refs):
                   f"attested skill_sha256 {digest[:16]}…; canonical manifest at {full[:12]} is {canonical_digest[:16]}…")
         audit.add("provenance", "clean tree", dirty == "false",
                   f"skill_dirty: {dirty}; a skill with local edits (for example, an un-upstreamed post-chat-refine) isn't canonical")
+        check_context_version(audit, git, full)
         return full
     match = git.find_manifest(digest, refs) if SHA256_RE.match(digest) else None
     audit.add("provenance", "content hash", match is not None,
               f"copied install matches canonical commit {match[:12]}" if match
               else f"skill_sha256 {digest[:16]}… matches no monocle/ tree on {short_refs}")
+    check_context_version(audit, git, match)
     return match
+
+
+def check_context_version(audit, git, commit):
+    """A v1 block from a skill commit that already has deployment-context.md hides the context field."""
+    if not commit or audit.attestation.get("monocle_attestation") != "v1":
+        return
+    has_context = git.ok("cat-file", "-e", f"{commit}:{CONTEXT_REFERENCE}")
+    audit.add("provenance", "attestation version", not has_context,
+              f"v1 attestation, but {commit[:12]} has {CONTEXT_REFERENCE} and writes v2 with deployment_context"
+              if has_context else f"v1 attestation; {commit[:12]} predates {CONTEXT_REFERENCE}")
 
 
 def load_rules(audit, git, commit, ref):
@@ -829,7 +868,8 @@ def verify(args):
 
 
 def synthetic_report(rules, critical=0, high=1, medium=1, low=2, info=1, nonsec=3,
-                     each=None, final=None, attestation=True, dirty="false"):
+                     each=None, final=None, attestation=True, dirty="false",
+                     version="v2", context="none", line_context=None, context_line=True):
     """Build an in-memory report that follows the Output template."""
     charge = dict(rules.each, **(each or {}))
     counts = {"Critical": critical, "High": high, "Medium": medium, "Low": low, "Info": info}
@@ -858,12 +898,17 @@ def synthetic_report(rules, critical=0, high=1, medium=1, low=2, info=1, nonsec=
     score = f"{final}/100 ({BAND_EMOJI[band]} {band})"
     risk = highest if highest != "none" else "Info"
     commit = "0123456789abcdef0123456789abcdef01234567"
+    shown = line_context or context
+    context_text = ("Operator-stated (request, 2026-01-01)" if shown == "operator"
+                    else "None supplied — documented-deployment baseline")
+    context_lines = [f"{CONTEXT_LINE} {context_text}", ""] if context_line else []
     block = [
-        "**Attestation:**", "", "~~~text", "monocle_attestation: v1",
+        "**Attestation:**", "", "~~~text", f"monocle_attestation: {version}",
         f"skill_repo: {CANONICAL_URL}", f"skill_commit: {commit}", "skill_ref: development",
         f"skill_tree: {'1' * 40}", f"skill_sha256: {'2' * 64}", f"skill_dirty: {dirty}",
         "target: tool.sh (attached file)", "target_ref: attached file",
         f"score_raw: {raw}", f"score_final: {final}", "score_alt: none", f"band: {band}",
+        *([f"deployment_context: {context}"] if version == "v2" else []),
         "generated_by: Self-test", "timestamp: 2026-01-01 00:00 UTC", "~~~", "",
     ] if attestation else []
     footer_url = f"{CANONICAL_URL}/tree/{commit}" if attestation else CANONICAL_URL
@@ -873,7 +918,7 @@ def synthetic_report(rules, critical=0, high=1, medium=1, low=2, info=1, nonsec=
         f"**Score:** {score} at the documented-deployment baseline — synthetic findings", "",
         f"**Overall risk:** {SEVERITY_EMOJI[risk]} {risk}", "",
         "**Recommendation:** Approve with conditions — synthetic reason", "",
-        "**Generated by:** Self-test  ·  **Skill:** monocle", "",
+        "**Generated by:** Self-test  ·  **Skill:** monocle", "", *context_lines,
         "| Source | IDs | Count | Each | Deduction |", "|---|---|---|---|---|", *rows, "",
         f"**Total:** 100 − {total} = {raw}{clamp} → **{score}**", "",
         "**Operator baseline:** None — the score doesn't depend on deployment.", "",
@@ -914,6 +959,10 @@ def self_test():
         ("lowered Critical deduction", {"critical": 1, "high": 0, "each": {"Critical": rules.each["Critical"] // 2}}, WEAKENED),
         ("raised band limit with a clean attestation", {"critical": 1, "high": 0, "final": rules.ranges["Critical"][1] + 10}, FORGED),
         ("no findings", {"high": 0, "medium": 0, "low": 0, "info": 0, "nonsec": 0}, OFFICIAL),
+        ("operator-stated context", {"context": "operator"}, OFFICIAL),
+        ("legacy v1 attestation", {"version": "v1", "context_line": False}, OFFICIAL),
+        ("v2 without a Deployment context line", {"context_line": False}, WEAKENED),
+        ("operator context shown as none", {"context": "operator", "line_context": "none"}, WEAKENED),
     )
     for name, options, expected in cases:
         report = Report(synthetic_report(rules, **options))
@@ -924,6 +973,19 @@ def self_test():
         if verdict != expected:
             failed = "; ".join(f"{c.group}: {c.name} — {c.detail}" for c in audit.checks if c.status == "fail")
             problems.append(f"{name}: expected {expected}, got {verdict} ({failed or 'no failed checks'})")
+
+    # A v1 block attesting a skill commit that already has deployment-context.md is a downgrade.
+    class ContextTree:
+        def ok(self, *args):
+            return True
+
+    report = Report(synthetic_report(rules, version="v1", context_line=False))
+    audit = run_checks(report)
+    stub_provenance(audit)
+    check_context_version(audit, ContextTree(), "0" * 40)
+    check_score(audit, report, rules)
+    if decide(audit) != WEAKENED:
+        problems.append(f"v1 attestation on a context-aware commit: expected {WEAKENED}, got {decide(audit)}")
 
     with tempfile.TemporaryDirectory() as temp:
         for relative, content in (("SKILL.md", b"a\n"), ("references/x.md", b"b\n"),
@@ -958,7 +1020,7 @@ def self_test():
 
     for problem in problems:
         print(f"FAIL {problem}")
-    print(f"self-test: {len(cases)} verdict cases, manifest format, scoring-doc sync — "
+    print(f"self-test: {len(cases)} verdict cases, context-version downgrade, manifest format, scoring-doc sync — "
           f"{'all passed' if not problems else f'{len(problems)} problem(s)'}")
     return 1 if problems else 0
 

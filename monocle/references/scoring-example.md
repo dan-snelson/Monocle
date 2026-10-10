@@ -2,7 +2,7 @@
 
 ## Purpose
 
-A fully worked Monocle Score calculation for SKILL.md Step 5. It shows the issue ledger (`scoring-procedure.md`) turned into a score, a Severity basis for each finding (`security.md`, Decision procedure), reason codes for what isn't scored, a headline with a single alternate, and a band floor. Load it when a score depends on deployment (headline vs alternate), when a band clamp applies, or when an admin-gated capability needs rating under Rule 14.
+A fully worked Monocle Score calculation for SKILL.md Step 5. It shows the issue ledger (`scoring-procedure.md`) turned into a score, a Severity basis for each finding (`security.md`, Decision procedure), reason codes for what isn't scored, a headline with a single alternate, and a band floor. Load it when a score depends on deployment (headline vs alternate), when a band clamp applies, when an admin-gated capability needs rating under Rule 14, or when an operator supplies a Deployment Context (`deployment-context.md`).
 
 ---
 
@@ -32,3 +32,24 @@ A fully worked Monocle Score calculation for SKILL.md Step 5. It shows the issue
   - Every interactive policy sets an allowlist that excludes EDR removal (S3 → High if not).
   - `/usr/local/bin` is root-owned on every Mac in scope (S4 → Medium if not).
   - Every policy runs the main script, not the wrapper (S8 → Medium if not).
+
+---
+
+**Deployment context variant.** Suppose instead a console-user zsh tool that builds support bundles. Its documentation describes an optional shared staging folder that only the support team may write. Seven non-security issues pass the inclusion test; one of them (N7, retention ordering by modification times that sync clients rewrite) occurs only in shared staging. The operator supplies this context: one admin Mac, no other local accounts, a local staging folder only, shared staging out of scope.
+
+| Finding | Documented baseline | With the operator's context | Alternate |
+|---|---|---|---|
+| The staging folder takes the default umask, so other local accounts can read bundles (Code + Deployment) | 🟡 Medium | 🔵 Low: Q3, the path runs but no other local account exists (mitigated) | 🟡 Medium |
+| The shared-staging config file chooses the upload destination (Code + Deployment) | 🔵 Low: Q3, the documentation limits writes to the team | ⚪ Info: Q3, shared staging is out of scope (mitigated) | 🟡 Medium |
+| Bundle redaction misses quoted-JSON secrets (Code) | 🔵 Low | 🔵 Low (independent) | 🔵 Low |
+| N7 | 2 | Not scored, `context` | 2 |
+| N1–N6 | 12 | 12 | 12 |
+| **Score** | 100 − 28 = **72/100 (🔵 Good)**; Overall risk 🟡 Medium | 100 − 18 = **82/100 (🔵 Good)**; Overall risk 🔵 Low | 100 − 33 = **67/100 (🟡 Fair)** |
+
+- **Headline:** 82/100 (🔵 Good), at the operator-stated deployment context. The Low range (70–100) doesn't bind.
+- **Alternate:** every Operator baseline condition fails at once (another local account exists, and shared staging is writable beyond the team): 67/100 (🟡 Fair), inside the Medium range (50–89). The documented baseline (72) isn't shown as a third score; the Deployment context lines say what the context changed.
+- **Operator baseline:**
+  - No other local accounts on the Mac (operator-stated) (umask finding → Medium if not).
+  - Staging stays local; shared staging is out of scope (operator-stated) (config finding → Medium, N7 scored, if not).
+- **The redaction gap is independent of deployment model.** No context item negates its precondition, so it keeps its rating in all three columns.
+- **Context can also raise.** Had the operator said the tool ships in the enrollment prestage to every Mac, Adjustment 1 would raise each finding one level, and the headline would fall below the documented baseline.

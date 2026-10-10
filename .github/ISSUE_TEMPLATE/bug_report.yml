@@ -92,6 +92,20 @@ body:
       required: true
 
   - type: dropdown
+    id: deployment-context
+    attributes:
+      label: Did the run use a Deployment Context?
+      description: Don't paste the context itself if it names your organization, hosts, or people.
+      options:
+        - None supplied
+        - Inline in the request
+        - File named in the request
+        - Saved context file (reports/contexts)
+        - Asked during the run
+    validations:
+      required: false
+
+  - type: dropdown
     id: affected-area
     attributes:
       label: Which area looks broken?
@@ -100,6 +114,7 @@ body:
         - Scoping / large targets
         - Findings accuracy (false positive or missed issue)
         - Monocle Score calculation / bands
+        - Deployment Context handling
         - Executive, Security, Manager, or Engineer view content
         - Semgrep scan
         - Report writing / reports directory

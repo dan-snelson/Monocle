@@ -13,6 +13,7 @@ How to use an earlier Monocle report on the same target, for SKILL.md Step 5. Lo
   - **Rejected:** the prior report was wrong; cite the evidence.
 
   Never drop a prior item silently. Prior items are checks to run, not ratings to copy: re-derive each one with the current procedure. Don't treat the prior report as current evidence until you have re-run the input classification, git status, ignored/local-file check, automated scan or its documented failure path, and citation verification against the current checkout.
+- **Deployment context changes.** Compare the prior report's **Deployment context** line with this run's. When they differ (including none versus operator-stated), each row whose Context effect differs is **Re-rated (context)**, and the **Score change** line lists those rows as a context change, not a code change. A prior report's context is never reused without the operator's confirmation (`deployment-context.md`).
 - **Match prior items by issue key** (`scoring-procedure.md`, Issue ledger). For reports written before keys existed, match by file, function, and defect class.
 - **Same ref and same skill commit, different score:** the **Score change** line lists every Re-rated and Rejected disposition, and every new issue, as a counting correction.
 - If the target ref/SHA or working tree status differs, treat the prior report as historical context only. Rebuild the fact sheet from the current target.

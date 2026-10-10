@@ -43,6 +43,7 @@ Use exactly this structure:
 
 **Execution context:** {root via Jamf policy | console user | launchd daemon as root | unknown — why}
 **Overall risk:** {🔴 Critical | 🟠 High | 🟡 Medium | 🔵 Low} — {one-sentence justification}
+**Deployment context:** {Operator-stated | None supplied} — {how it changes the risk picture: which S# it mitigates and why, which it raises, and "independent of deployment model:" the rest}
 
 ### Findings
 
@@ -54,6 +55,7 @@ Use exactly this structure:
 #### S1 — {Title}  ·  **{severity emoji} {Severity}**
 - **Location:** `file:line` (or function name)
 - **Origin:** {Code | Platform | Deployment, or a combination} — {one sentence: the platform behavior or configuration choice involved, and what the code already does about it} (see SKILL.md Rule 13)
+- **Context:** {Mitigated by deployment context — {context item}; {alternate severity} outside it | Raised by deployment context — {context item} | Independent of deployment model}
 - **Severity basis:** {path through the Decision procedure, e.g. "Q2: a local user gets root code execution; Q3: the documented baseline closes the precondition → Low; alternate High"}
 - **Evidence:** `{short code quote, secrets redacted}`
 - **Impact:** {What an attacker or failure can achieve, and against what}
@@ -81,6 +83,7 @@ Rules:
 
 - **Tone:** factual and technical. Don't use "catastrophic" or other hype. Let the severity carry the weight.
 - **Order findings by severity,** then by first `file:line` (`scoring-procedure.md`, Issue ledger).
+- **Write the Deployment context line after rating,** from each row's Context effect (`deployment-context.md`). Keep it to one to three sentences. With no context, write "None supplied — rated at the documented-deployment baseline", and name the findings an operator context could change, if any. Every finding's **Context:** line agrees with it.
 - **Give every Low or higher finding its own row and `S#`.** Merge only under the distinct-issue test (`scoring-procedure.md`). The "Low / Info" roll-up holds credits and Info observations only. Past about 10 findings, keep the extra Low write-ups to Location, Evidence, and Fix.
 - **Quote evidence verbatim,** with secrets redacted to the first 4 characters plus `…`.
 - **Make fixes concrete.** "Use `curl --fail --proto '=https' --tlsv1.2`" is a fix. "Improve TLS handling" is not.
@@ -125,8 +128,8 @@ Answer these questions in order for each ledger row (`scoring-procedure.md`) bef
   - Otherwise the row is at least 🔵 Low. A security-relevant gap with a concrete code fix is never Info.
   - Rate disclosure by what the code itself writes. Treat relayed output of other programs as unknown content: 🔵 Low at most, and never assume it holds a specific secret.
   - If only an admin can trigger the gap, rate it here as if a non-admin could, then apply the lowering adjustment.
-- **Q3 — Baseline.** Rate Deployment-origin exposure at the documented-deployment baseline (SKILL.md Rule 11).
-  - If the documented deployment never runs the vulnerable code (an undeployed file, or a parameter the documentation leaves blank), the headline is ⚪ Info.
+- **Q3 — Baseline and context.** Rate Deployment-origin exposure at the operator's Deployment Context when one is supplied, otherwise at the documented-deployment baseline (SKILL.md Rule 11, `deployment-context.md`).
+  - If the deployment never runs the vulnerable code (an undeployed file, a parameter the documentation leaves blank, or a mode the operator's context puts out of scope), the headline is ⚪ Info.
   - If the deployment runs the code but closes the precondition, the headline is 🔵 Low, and the walk ends.
   - In both cases, the alternate is what Q4–Q5 give with the precondition met. When the code offers no safe way to deploy, the exposure stays in the headline.
 - **Q4 — Example match.** If a Typical examples cell in the table above matches the scenario that remains after Q3, use that row.
@@ -139,7 +142,7 @@ Answer these questions in order for each ledger row (`scoring-procedure.md`) bef
 
 **Adjustments.** Apply these after the walk, in this order and at most once each, and name each one in the Severity basis line. Neither applies to credential findings (see **Credential severity**).
 
-1. **Raise one level** when the target's own documentation or packaging deploys it fleet-wide by default, for example a pkg in the enrollment prestage, an Extension Attribute, a LaunchDaemon on every Mac, or a Jamf policy scoped to All Computers. Never raise into 🔴 Critical: only the Critical criteria give Critical.
+1. **Raise one level** when the target's own documentation or packaging deploys it fleet-wide by default, or the operator's Deployment Context states fleet-wide deployment, for example a pkg in the enrollment prestage, an Extension Attribute, a LaunchDaemon on every Mac, or a Jamf policy scoped to All Computers. Never raise into 🔴 Critical: only the Critical criteria give Critical.
 2. **Lower one level** when the vulnerable path requires admin access that already implies equivalent power. Say so explicitly.
 
 Overall risk equals the highest headline severity. When the alternate's highest severity differs, give it too.

@@ -12,7 +12,7 @@
 
 ## Purpose
 
-The fixed procedure that turns the fact sheet into scored issues, for SKILL.md Step 5 item 1. Load it on every run after Step 4 and before writing any view, together with the Decision procedure in `security.md`. Verify mode (`verify-report.md`, Step 2) uses it too.
+The fixed procedure that turns the fact sheet into scored issues, for SKILL.md Step 5 item 1. Load it on every run after Step 4 and before writing any view, together with the Decision procedure in `security.md` and `deployment-context.md`. Verify mode (`verify-report.md`, Step 2) uses it too.
 
 Two runs on the same code and documentation should produce the same ledger. Each rule here removes a judgment call that used to move scores between runs. The procedure decides how issues are counted, never what you look for: Step 4 stays open-ended, and anything you notice gets a ledger row.
 
@@ -29,6 +29,7 @@ Extend the fact sheet with one row per candidate issue: every Step 4 hit, and ev
 | Location | Every `file:line`, checked in SKILL.md Step 5 item 7, pass 1 |
 | Evidence | Observed, or inferred with its basis (SKILL.md Rule 3) |
 | Severity basis | The path through the Decision procedure in `security.md`, or the inclusion-test result |
+| Context effect | `mitigated`, `raised`, or `independent`, naming the Deployment Context item that moves it (`deployment-context.md`) |
 | Disposition | Scored at its weight, or not scored with exactly one reason code |
 
 - **No ledger row, no score.** A view mentions only issues that have a row. If writing a view turns up a new issue, add a row, rate it with this procedure, update any views already written, and recompute the score. Never count a bullet that has no row.
@@ -130,25 +131,27 @@ Apply the reason codes first: any match makes the issue an `X#`, not scored. Oth
 | `immaterial` | None of the listed consequences, including slow growth bounded by user-started runs |
 | `capability` | An intended capability that passes the Rule 14 checklist |
 | `inferred-unverified` | Depends on unverified third-party behavior along a code path you didn't trace |
+| `context` | Its only trigger is in a configuration the operator's Deployment Context puts out of scope. The alternate scores it |
 
 ## Operator baseline and alternate
 
 Build both mechanically from the ledger:
 
-- **One bullet per scored finding whose headline depends on a deployment condition:** `{condition, as the documentation states it} ({doc file:line}) (S# → {severity} if not)`. If no documentation line exists, the control is undocumented, and the headline takes the unsafe rating (SKILL.md Step 5, "Undocumented controls get no credit").
+- **One bullet per scored finding whose headline depends on a deployment condition:** `{condition, as the documentation states it} ({doc file:line}) (S# → {severity} if not)`, or `{condition, as the operator states it} (operator-stated) (S# → {severity} if not)` when the Deployment Context sets it. Without context, a condition with no documentation line is an undocumented control, and the headline takes the unsafe rating (`deployment-context.md`, Undocumented controls).
 - **Then one bullet per distinct admin gate** from the Rule 14 checklist, marked "(Rule 14 gate; not scored)".
 - **Order:** finding bullets by ID, then gate bullets. If both lists are empty, write "None — the score doesn't depend on deployment."
-- **One alternate only.** Assume every finding bullet's condition fails at once; the Rule 14 gate bullets don't take part. The alternate's condition text is the negation of those finding bullets. Recompute from the same ledger with the alternate severities, and clamp the result the same way.
+- **One alternate only.** Assume every finding bullet's condition fails at once; the Rule 14 gate bullets don't take part. The alternate's condition text is the negation of those finding bullets. Recompute from the same ledger with the alternate severities, score every `context` row, and clamp the result the same way.
 - **Read operator instructions by their evident scope.** An instruction to secure or validate a path covers every directory on that path.
-- **Host evidence never sets a severity.** The reviewer's Mac can confirm an Apple platform default (SKILL.md Rule 13). It can't establish a deployment state, or what another tool's installer did.
+- **Host evidence never sets a severity.** The reviewer's Mac can confirm an Apple platform default (SKILL.md Rule 13). It can't establish a deployment state, or what another tool's installer did. Only the operator's Deployment Context can state a deployment state.
 
 ## Freeze check
 
 Before writing any view, confirm:
 
 - Every Step 4 hit, and every bullet you plan to write, has a ledger row.
-- Every `S#` has a Severity basis. Every Info row passes the Info test in Q2. No Low is folded into the roll-up.
+- Every `S#` has a Severity basis. Every Info row passes the Info test in Q2, or reached Info at Q3 (undeployed, or out of the Deployment Context's scope). No Low is folded into the roll-up.
 - Every `X#` has exactly one reason code.
+- Every row has a Context effect, and the Deployment Context was applied, asked for once, or not needed (`deployment-context.md`, Eliciting context).
 - The distinct-issue test was applied, and IDs are numbered in the fixed order.
 - The Operator baseline and the single alternate were built as described above.
 - The score was computed from the ledger.
