@@ -26,4 +26,10 @@ One script can blow the limit on its own (for example, a 9,000-line zsh file). D
 3. Pattern-scan the rest for the SKILL.md Step 2 item 6 commands, plus `eval`, `rm -rf`, `mktemp`, `/tmp/`, `/var/tmp/`, `chown`, `chmod`, and `> "`. Read the surrounding function wherever a scan hits.
 4. In **Scope caveats**, list the exact line ranges you read, estimate the direct-read coverage percentage, and name the functions you only scanned. Keep a running list of the ranges while you read, then compute coverage by summing them. Don't estimate it afterwards. Merge adjacent or overlapping ranges before summing (for example, 5918–6283 and 6284–6999 become 5918–6999), because reads split across tool calls double-count easily.
 
+### Delegating reads to sub-agents
+
+When the runtime offers parallel sub-agents and the target is several times over the limits, split the direct reads by risk cluster (for example: process execution and installers; credentials and persistence; filesystem, logging, and bundles; network, rendered output, and CI). Give each agent the execution context, its file list, the grep terms for its cluster, and the Step 4 checks that apply, and require verified `file:line` citations marked observed or inferred. When a prior report covers an earlier ref, also give each agent the prior items in its cluster to disposition (closed, partly closed, or persisting, with the commit that changed each) and the `git diff <prior-ref>..HEAD` for its files to check for regressions. Their results are leads, not evidence: re-check every finding, footgun, and citation in the clone before it enters the report, and say in Scope caveats that the reads were delegated and re-verified. Compute coverage from the files the agents read in full plus your own ranges.
+
+### Progress notes
+
 For long runs like this, post a one-line progress note between phases (fetch, read, analysis, writing), and at least every 5 or so tool calls within a phase. A 10,000-line review takes dozens of calls, and long silent stretches make users think the work has stalled. The manual reading in SKILL.md Step 4 is where silence builds up most, so keep up the notes there too.

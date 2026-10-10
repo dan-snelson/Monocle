@@ -75,7 +75,7 @@ Rules:
 ## Key questions the summary must answer
 
 1. **Who owns this?** Look for author headers, `CODEOWNERS`, and commit history. Note bus factor: if 90% or more of commits come from one author, say so.
-2. **Is it actively maintained?** Last commit date, version string, changelog, and open TODOs/FIXMEs.
+2. **Is it actively maintained?** Last commit date, version string, changelog, and open TODOs/FIXMEs. Compare the analyzed ref with the latest release tag (`git describe --tags`, or an `[Unreleased]` changelog section): fixes credited after the tag haven't reached installed copies, so say so under **What it depends on** and in the Executive view.
 3. **What does it depend on?** External binaries, remote URLs, APIs, Jamf objects (policies, EAs, smart groups), OS versions, and specific people.
 4. **What breaks it?** OS upgrades, a vendor URL change, credential rotation, a missing dependency, network changes, or renamed Jamf objects.
 5. **How would we know it broke?** Logging, exit codes, alerts, or nothing.
