@@ -137,10 +137,10 @@ Apply the reason codes first: any match makes the issue an `X#`, not scored. Oth
 
 Build both mechanically from the ledger:
 
-- **One bullet per scored finding whose headline depends on a deployment condition:** `{condition, as the documentation states it} ({doc file:line}) (S# → {severity} if not)`, or `{condition, as the operator states it} (operator-stated) (S# → {severity} if not)` when the Deployment Context sets it. Without context, a condition with no documentation line is an undocumented control, and the headline takes the unsafe rating (`deployment-context.md`, Undocumented controls).
+- **One bullet per scored finding whose headline depends on a deployment condition:** `{condition, as the documentation states it} ({doc file:line}) (S# → {severity} if not)`, or `{condition, as the operator states it} (operator-stated) (S# → {severity} if not)` when the Deployment Context sets it. The `file:line` is the line that states the condition. A nearby heading, warning, or comment is not that line. Without context, a condition with no documentation line is an undocumented control, and the headline takes the unsafe rating (`deployment-context.md`, Undocumented controls).
 - **Then one bullet per distinct admin gate** from the Rule 14 checklist, marked "(Rule 14 gate; not scored)".
 - **Order:** finding bullets by ID, then gate bullets. If both lists are empty, write "None — the score doesn't depend on deployment."
-- **One alternate only.** Assume every finding bullet's condition fails at once; the Rule 14 gate bullets don't take part. The alternate's condition text is the negation of those finding bullets. Recompute from the same ledger with the alternate severities, score every `context` row, and clamp the result the same way.
+- **One alternate only.** Assume every finding bullet's condition fails at once; the Rule 14 gate bullets don't take part. A default-off administrator control belongs in the finding's Impact. The alternate's condition text is the negation of those finding bullets. Recompute from the same ledger with the alternate severities, score every `context` row, and clamp the result the same way.
 - **Read operator instructions by their evident scope.** An instruction to secure or validate a path covers every directory on that path.
 - **Host evidence never sets a severity.** The reviewer's Mac can confirm an Apple platform default (SKILL.md Rule 13). It can't establish a deployment state, or what another tool's installer did. Only the operator's Deployment Context can state a deployment state.
 

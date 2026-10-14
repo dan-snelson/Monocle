@@ -137,12 +137,12 @@ Answer these questions in order for each ledger row (`scoring-procedure.md`) bef
 
 **Definitions:**
 
-- **Weak integrity check (Medium):** a check an attacker can pass without the pinned vendor's signing key. Examples: a name-only signature check, a hash fetched over the same channel as the file, or no check at all. When the code pins the vendor's identity, a missing Gatekeeper, notarization, or revocation verdict is 🔵 Low.
+- **Weak integrity check (Medium):** a check an attacker can pass without the pinned vendor's signing key. Examples: a name-only signature check, a hash fetched over the same channel as the file, or no check at all. When the code pins the vendor's identity, a missing Gatekeeper, notarization, or revocation verdict is 🔵 Low. A credit for that pin does not retire this Low, or the Low for an already-installed binary accepted on version alone.
 - **Inferred rows:** when the code path that depends on a third-party behavior is observed, rate the behavior as if it holds and label the row inferred (SKILL.md Rule 3). Never drop or downgrade a row because it is inferred.
 
 **Adjustments.** Apply these after the walk, in this order and at most once each, and name each one in the Severity basis line. Neither applies to credential findings (see **Credential severity**).
 
-1. **Raise one level** when the target's own documentation or packaging deploys it fleet-wide by default, or the operator's Deployment Context states fleet-wide deployment, for example a pkg in the enrollment prestage, an Extension Attribute, a LaunchDaemon on every Mac, or a Jamf policy scoped to All Computers. Never raise into 🔴 Critical: only the Critical criteria give Critical.
+1. **Raise one level** when the target's own documentation or packaging deploys it fleet-wide by default, or the operator's Deployment Context states fleet-wide deployment, for example a pkg in the enrollment prestage or an Extension Attribute. A LaunchDaemon the administrator scopes is not fleet-wide by default, and a Jamf policy is not fleet-wide unless Deployment Context states that scope. With no Deployment Context, do not raise for either. A fleet raise does not make High a forged local record, or a notice that cannot change what the platform enforces (`patterns.md`). Never raise into 🔴 Critical: only the Critical criteria give Critical.
 2. **Lower one level** when the vulnerable path requires admin access that already implies equivalent power. Say so explicitly.
 
 Overall risk equals the highest headline severity. When the alternate's highest severity differs, give it too.

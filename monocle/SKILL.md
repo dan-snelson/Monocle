@@ -156,7 +156,7 @@ Capture:
 | Persistence | LaunchDaemons/Agents, login items, cron, profiles, or files that survive a reboot |
 | Dependencies | External binaries (`jq`, `dialog`, `python3`, `brew`), frameworks, remote scripts; for each file root executes, who can write it and its parent directories, and what the code checks |
 | Error handling | `set -e`/`-u`/`pipefail`, traps, exit codes, `try`/`except` coverage; every exit path, and whether partial failures exit 0 |
-| Logging | Where logs go, what they include, and whether secrets leak into them; each log file's mode and what sets it |
+| Logging | Where logs go, what they include, and whether secrets leak into them; each log file's mode and what sets it. A log touch that runs before preference load does not cover the path a later preference selects |
 | Environment assumptions | OS version, CPU arch, paths, network, logged-in user, FileVault, MDM enrollment |
 | Idempotency | Whether running it twice is safe |
 | Ownership signals | Author headers, version strings, changelog, commit history. Check whether recent commits share one version string (`git log -10 --format='%h %ad %s' --date=short`). Many commits under the same version are concrete evidence for any version-gated deploy or cache finding |
