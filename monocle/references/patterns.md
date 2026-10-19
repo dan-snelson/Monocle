@@ -95,4 +95,4 @@ Extends SKILL.md Rule 13. Check this list before naming a Platform origin, and c
 - **Bundled tools.** `python3` is no longer bundled; `/usr/bin/jq` ships only on macOS 15+.
 - **APFS is case-insensitive by default.** `Id` resolves to `/usr/bin/id`.
 - **Console-user placeholders.** With no one logged in, the console user reads `loginwindow`; during Setup Assistant, `_mbsetupuser`.
-- **Empty collections are not failed reads.** `PlistBuddy -c 'Print :Items'` exits 1 when the file is missing or the key is absent, and exits 0 when a present file's `Items` value is an empty dict or an empty array. Don't describe those results as one branch. A failed read and an empty collection can take opposite branches. Confirm that handling with an isolated check before writing it.
+- **Empty collections are not failed reads.** `PlistBuddy -c 'Print :Items'` exits 1 when the file is missing or the key is absent, and exits 0 when a present file's `Items` value is an empty dict or an empty array (Darwin 25). Don't describe those results as one branch. A failed read and an empty collection can take opposite branches. Confirm that handling with an isolated check before writing it.

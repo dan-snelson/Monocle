@@ -30,7 +30,7 @@ Use exactly this structure:
 ```markdown
 ## Executive View
 
-**In one sentence:** {What it does, who declared the action, and why it exists, in business terms.}
+**In one sentence:** {What it does and why it exists, in business terms.}
 
 - {Bullet 1}
 - {Bullet 2}
@@ -48,10 +48,10 @@ Rules:
 
 - **1–6 bullets.** Use as many as the real risks and facts need, and no more. Don't pad a low-risk view to reach a count (SKILL.md Rule 7).
 - **Plain language.** Don't use jargon, command names, file paths, or line numbers. Write "administrator-level access to every Mac", not "runs as root via Jamf policy". Mention product names (Jamf, Okta, Slack) only when the reader would recognize them.
-- **Name who set the requirement.** The one-sentence, and every bullet about that action, names the party that declared it. When an administrator configures the action and the platform enforces it later, name the administrator. Don't write that the platform required it. Forged local input does not change the enforced result.
-- **Lead with impact.** Each bullet states a consequence first and the cause second, if at all. Lead with the usual outcome. When the bad outcome needs an uncommon precondition, and the common path rejects the untrusted input, say the bad case is uncommon. Use "could" for that precondition. "The code runs on every managed Mac" is not "the bad outcome happens on every managed Mac." Don't write "on every Mac" for the failure.
+- **Name who set the requirement.** When the tool reminds about or reports on a requirement someone else set, such as an OS-update deadline, the one-sentence and every bullet about it name that party (usually the administrator), not the platform or the tool. When the platform enforces the outcome whatever the tool does (`patterns.md`, DDM enforcement doesn't depend on reminder tools), say a fault in the tool weakens the reminder, not the enforcement.
+- **Lead with impact.** Each bullet states a consequence first and the cause second, if at all. When the bad outcome needs an uncommon precondition, say so and use "could": "runs on every managed Mac" is not "fails on every managed Mac."
 - **Quantify when possible.** "All managed Macs", "about 30 seconds per device", "requires a restart", "one person maintains it".
-- **Neutral, confident tone.** Don't be alarmist, and don't hedge a likely outcome away. An uncommon precondition is real uncertainty: use "could" there. Stating that rare failure as the normal case is the alarmist reading of this rule.
+- **Neutral, confident tone.** Don't be alarmist, and don't hedge the point away. Use "could" only for real uncertainty, such as an uncommon precondition.
 - **One recommendation.** Always include one. Never write "it depends" without saying on what. Don't repeat as conditions what the operator's Deployment Context already states. When the context mitigated a finding, end with "re-review if the deployment changes".
 - **Deployment context line.** Always include it; it doesn't count toward the 1–6 bullets. With operator context, say in plain words what the stated deployment removes and what stays regardless of it, for example "You described one administrator's Mac with its data in a private folder. That removes the shared-folder risks; the gaps in what support bundles hide remain whatever the deployment." Bullets lead with risks that apply to the stated deployment; a risk the context removes appears only in this line. It agrees with the Monocle Score section's **Deployment context** block (`deployment-context.md`).
 - **Monocle Score line.** Copy the score and band from the report's Monocle Score section (SKILL.md, Step 5, Monocle Score). The first number assumes the tool is deployed as the operator's Deployment Context states, or as documented when none was given. Write the condition for the alternate as the administrator action it depends on, in plain language, for example "or 25/100 (🟠 Poor) if any Self Service policy offers every action". Leave the breakdown out of this view; it has its own section. The score line doesn't count toward the 1–6 bullets.
@@ -90,9 +90,7 @@ Put bullets in this order:
 2. User or business disruption (restarts, prompts, downtime, data loss).
 3. Blast radius and reversibility.
 4. Ownership or maintenance risk, if significant.
-5. Positive notes (well-built, low-risk). Include at most one, and only if the view needs it for balance. When that bullet is the usual case, the next paragraph puts it first instead.
-
-When the one positive bullet is the usual case (the common path rejects untrusted input, and a check gates the sensitive action), put it first. Then the uncommon failure. Then administrator-controlled actions. "Lead with impact" means the usual outcome first, not the exception. When the top risk is itself the usual outcome, the numbered list above still applies.
+5. Positive notes (well-built, low-risk). Include at most one, and only if the view needs it for balance.
 
 When there are no significant risks, say so plainly: "Low risk: it only reads settings and changes nothing."
 
