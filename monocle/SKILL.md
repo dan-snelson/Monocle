@@ -29,7 +29,7 @@ More reference files are loaded by step or by trigger, not by view:
 - `references/large-targets.md` — reading plan, coverage math, and progress notes for oversized targets. Load it when Step 2 says the target is oversized.
 - `references/patterns.md` — a quick-reference table of common risky patterns, plus the Known Apple platform behaviors list (Rule 13). Load it at Step 3, before the fact sheet; Step 4 uses it too.
 - `references/semgrep.md` — the scan command, rulesets, skip accounting, and triage for the automated scan. Load it in Step 4 when semgrep is installed.
-- `references/lang-shell.md`, `references/lang-python.md`, `references/lang-swift.md`, `references/lang-applescript.md` — language checks for Step 4. Load each one whose language Step 1 found, before the manual checks.
+- `references/lang-shell.md`, `references/lang-python.md`, `references/lang-swift.md`, `references/lang-applescript.md` — language checks for Step 4. Load each one whose language the fact sheet's Language(s) row lists, before the manual checks.
 - `references/specialized-checks.md` — bundle intake (Step 1 E) and the conditional Step 4 checks listed under **Specialized checks**. Load it when Step 1 E or Step 4 says its trigger applies.
 - `references/prior-reports.md` — how to use an earlier report on the same target. Load it in Step 5 when one exists.
 - `references/scoring-procedure.md` — the issue ledger, distinct-issue test, Rule 14 checklist, non-security inclusion test, and Operator baseline construction. Load it on every run at Step 5 item 1.
@@ -169,7 +169,7 @@ Mark each fact **observed** (seen in code, with `file:line`) or **inferred** (re
 
 ## 4️⃣ Step 4 — Check the high-risk areas
 
-For shell, Python, AppleScript, Swift, and Jamf/macOS code, explicitly check the areas below. First load the `references/lang-*.md` file for each language Step 1 found; its checks are as mandatory as the rest of Step 4. Record hits in the fact sheet with `file:line`.
+For shell, Python, AppleScript, Swift, and Jamf/macOS code, explicitly check the areas below. First load the `references/lang-*.md` file for each language in the fact sheet's Language(s) row; its checks are as mandatory as the rest of Step 4. Record hits in the fact sheet with `file:line`.
 
 ### Automated scan (when `semgrep` is available)
 
@@ -369,7 +369,7 @@ Use this layout for the full report. Keep all headings, even when a section is s
 
 **Total:** 100 − {deductions} = {raw}{; capped at {cap} by the {severity} range | ; floored at {floor} by the {severity} range} → **{n}/100 ({band emoji} {band})**
 {If conditional: one line with the alternate total, its clamp, and the condition that produces it.}
-{If a prior report covers an earlier ref: **Score change:** {±n} from {prior} at `{prior ref}`, followed by nested bullets labeled **Closed:**, **Persisting:**, and **New:**, with each new finding marked as introduced or previously missed.}
+{If a prior report covers an earlier ref: **Score change:** {±n} from {prior} at `{prior ref}`, followed by nested bullets labeled **Closed:**, **Persisting:**, and **New:**, with each new finding marked as introduced, previously missed, or previously out of scope.}
 
 **Operator baseline:** {What the headline assumes the Mac Admin has done, one bullet per condition, each naming its source, (operator-stated) or the doc line, and the finding it flips, e.g. "Every interactive policy sets the allowlist parameter and excludes EDR removal (README.md:{n}) (S2 → High if not)". Or "None — the score doesn't depend on deployment."}
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Language checks for Swift and Objective-C (macOS helpers, daemons, GUI apps) targets, for SKILL.md Step 4. Load this file at the start of Step 4 when Step 1 found Swift or Objective-C code, before the manual checks. Each section names the view its hits usually feed; every hit still gets a ledger row (`scoring-procedure.md`).
+Language checks for Swift and Objective-C (macOS helpers, daemons, GUI apps) targets, for SKILL.md Step 4. Load this file at the start of Step 4 when the fact sheet's Language(s) row lists Swift or Objective-C code, before the manual checks. Each section names the view its hits usually feed; every hit still gets a ledger row (`scoring-procedure.md`).
 
 ---
 

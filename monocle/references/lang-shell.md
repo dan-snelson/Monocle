@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Language checks for sh, bash, and zsh targets, for SKILL.md Step 4. Load this file at the start of Step 4 when Step 1 found shell code, before the manual checks. Each section names the view its hits usually feed; every hit still gets a ledger row (`scoring-procedure.md`).
+Language checks for sh, bash, and zsh targets, for SKILL.md Step 4. Load this file at the start of Step 4 when the fact sheet's Language(s) row lists shell code, before the manual checks. Each section names the view its hits usually feed; every hit still gets a ledger row (`scoring-procedure.md`).
 
 ---
 

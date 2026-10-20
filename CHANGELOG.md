@@ -25,7 +25,9 @@
 - Size limits are exact (30 source files, 5,000 lines, or one file over 5,000 lines); a headline High finding gives "Approve with conditions" only with a named fix or control
 - Reports are written inside a git repo only when the path is gitignored; pass 2 and the self-check run on the saved report before the reply, which freezes it
 - Executive view names who set a requirement once, and uses "could" for outcomes that need an uncommon precondition; corrected Good examples in the Executive, Security, and Engineer references and the worked score example
-- Fact sheet and Step 4 trimmed where `patterns.md`, `security.md`, or `specialized-checks.md` already hold the check; Known Apple platform behaviors adds PlistBuddy's empty-collection vs failed-read exit codes
+- Fact sheet and Step 4 trimmed where `patterns.md`, `security.md`, or `specialized-checks.md` already hold the check; Known Apple platform behaviors adds PlistBuddy's empty-collection vs failed-read exit codes; the trimmed `argv`-exposure, installer-payload, and Homebrew-prefix notes moved to `patterns.md`
+- `patterns.md` adds fail-open on/off toggles ("defaulting to true"), root ownership walks that miss a symlinked intermediate directory, and `NO_CLOBBER` writes that open a raced-in FIFO
+- Deployment Context asks the trust boundary of maintainer tooling as a separate question about the maintainer's machine; a prior report with a different scope labels findings "previously out of scope"
 
 ### "A" as in aisle (10-Oct-2026)
 
