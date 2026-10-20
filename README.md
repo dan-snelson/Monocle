@@ -27,6 +27,10 @@ monocle/
     ├── large-targets.md        # Reading plan and coverage for oversized targets
     ├── patterns.md             # Quick-reference table of risky Jamf/macOS/Python patterns, plus Known Apple platform behaviors
     ├── semgrep.md              # Automated-scan command, rulesets, skip accounting, and triage
+    ├── lang-shell.md           # Step 4 checks for sh / bash / zsh, loaded when the target has shell code
+    ├── lang-python.md          # Step 4 checks for Python, loaded when the target has Python code
+    ├── lang-swift.md           # Step 4 checks for Swift / Objective-C helpers, loaded on detection
+    ├── lang-applescript.md     # Step 4 checks for AppleScript / osascript, loaded on detection
     ├── specialized-checks.md   # Bundle intake and the conditional Step 4 checks, loaded on trigger
     ├── prior-reports.md        # Using an earlier report on the same target
     ├── scoring-procedure.md    # Issue ledger, distinct-issue test, Rule 14 checklist, and non-security reason codes
@@ -139,11 +143,11 @@ The score rates the code, not the Mac Admin. Mac Admin tools are meant to be pow
 
 - **Capabilities aren't defects.** A documented operation behind an admin-controlled gate (a Jamf parameter, policy scope, an allowlist, an operation mode) isn't scored, even if it removes an EDR agent or deletes data. It counts only when the gate can be bypassed, fails open, or is defeated by the code. A blank-parameter default that offers everything counts as one Low finding.
 - **Deployment-context headline.** When a severity depends on deployment, the headline rates the **Deployment context** you supplied, or, without one, the tool deployed as documented. The misconfigured score is given as the alternate, and the report lists each assumption, marked operator-stated or documented, as an **Operator baseline** checklist. If the code offers no safe way to deploy, the exposure counts in the headline.
-- **Mitigated vs independent.** A finding that needs a configuration your context rules out drops to Info and is labeled *mitigated by deployment context*; a wider deployment than documented raises severities. Code defects keep their full severity and are labeled *independent of deployment model*. Context changes ratings and the recommendation, never the evidence.
+- **Mitigated vs independent.** A finding whose path your context rules out drops to Info; one whose precondition your context removes drops to Low. Both are labeled *mitigated by deployment context*, and a wider deployment than documented raises severities. Code defects keep their full severity and are labeled *independent of deployment model*. Context changes ratings and the recommendation, never the evidence.
 - **Maintainer-only tooling isn't scored.** Examples are release helpers and sync scripts. Its issues are still reported.
 - **Fixed scoring procedure.** Every issue goes through one ledger, with a severity decision procedure, a distinct-issue test, a Rule 14 checklist, and reason codes for anything not scored, so re-runs of the same code give the same score.
 
-The full rules are in `monocle/SKILL.md`, Step 5 and Rule 14, and in `monocle/references/deployment-context.md`.
+The full rules are in `monocle/SKILL.md` (Step 5 and Rule 14), `monocle/references/scoring-procedure.md`, the Decision procedure in `monocle/references/security.md`, and `monocle/references/deployment-context.md`.
 
 ### 🔏 Report attestation
 

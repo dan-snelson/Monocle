@@ -4,7 +4,7 @@
 
 How to stamp a report with the attestation block, for SKILL.md Step 5 item 8. Load this file once the score is final and before you write the report. The block records which skill text produced the report and what score it gave. `references/verify-report.md` checks it later.
 
-The attestation is self-asserted text, not a signature. It pins the claims so a checker can compare them with the canonical repository and recompute the score. It can't prove that the run followed the rules. Fill it in honestly, and never edit it after the report is written.
+The attestation is self-asserted text, not a signature. It pins the claims so a checker can compare them with the canonical repository and recompute the score. It can't prove that the run followed the rules. Fill it in honestly. Correct it only for what the self-check flags, before you reply; never edit it after.
 
 This file also holds the shell block that resolves the reports directory for SKILL.md Step 5 item 9 (and for the prior-report and saved-context checks at the start of Step 5).
 
@@ -52,7 +52,7 @@ skill_sha256=$(cd "$skill_dir" && find . -type f ! -name .DS_Store ! -path '*/__
 printf '%s\n' "commit=$skill_commit" "ref=$skill_ref" "tree=$skill_tree" "dirty=$skill_dirty" "sha256=$skill_sha256"
 ```
 
-- **Monocle checkout** (the same test as Step 5 item 9): the commit, branch, `monocle/` tree hash, and whether `monocle/` has local edits. post-chat-refine edits count as local edits until they are committed upstream.
+- **Monocle checkout** (the same test as SKILL.md Step 5 item 9): the commit, branch, `monocle/` tree hash, and whether `monocle/` has local edits. post-chat-refine edits count as local edits until they are committed upstream.
 - **Copied install:** the commit and tree are unknown. `skill_sha256` still identifies the content, so a checker can match it against canonical history.
 - **`skill_sha256`** hashes a manifest of every file in the skill directory: one `<sha256>  ./<path>` line per file, sorted bytewise. `python3 "$skill_dir/scripts/verify_report.py" --manifest "$skill_dir"` prints the same value. Use it when `shasum` is missing.
 

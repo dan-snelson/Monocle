@@ -48,11 +48,11 @@ Rules:
 
 - **1–6 bullets.** Use as many as the real risks and facts need, and no more. Don't pad a low-risk view to reach a count (SKILL.md Rule 7).
 - **Plain language.** Don't use jargon, command names, file paths, or line numbers. Write "administrator-level access to every Mac", not "runs as root via Jamf policy". Mention product names (Jamf, Okta, Slack) only when the reader would recognize them.
-- **Name who set the requirement.** When the tool reminds about or reports on a requirement someone else set, such as an OS-update deadline, the one-sentence and every bullet about it name that party (usually the administrator), not the platform or the tool. When the platform enforces the outcome whatever the tool does (`patterns.md`, DDM enforcement doesn't depend on reminder tools), say a fault in the tool weakens the reminder, not the enforcement.
+- **Name who set the requirement.** When the tool reminds about or reports on a requirement another party set (an OS-update deadline, an encryption policy), name that party, usually the administrator, in the first sentence or bullet that mentions it; don't credit the platform or the tool. If the platform enforces the outcome anyway, say a fault in the tool weakens the reminder, not the enforcement (`patterns.md`, DDM enforcement doesn't depend on reminder tools).
 - **Lead with impact.** Each bullet states a consequence first and the cause second, if at all. When the bad outcome needs an uncommon precondition, say so and use "could": "runs on every managed Mac" is not "fails on every managed Mac."
 - **Quantify when possible.** "All managed Macs", "about 30 seconds per device", "requires a restart", "one person maintains it".
-- **Neutral, confident tone.** Don't be alarmist, and don't hedge the point away. Use "could" only for real uncertainty, such as an uncommon precondition.
-- **One recommendation.** Always include one. Never write "it depends" without saying on what. Don't repeat as conditions what the operator's Deployment Context already states. When the context mitigated a finding, end with "re-review if the deployment changes".
+- **Neutral, confident tone.** Don't be alarmist, and don't hedge the point away. Use "could" only for real uncertainty.
+- **One recommendation.** Always include one. Never write "it depends" without saying on what. When the context mitigated a finding, end with "re-review if the deployment changes".
 - **Deployment context line.** Always include it; it doesn't count toward the 1–6 bullets. With operator context, say in plain words what the stated deployment removes and what stays regardless of it, for example "You described one administrator's Mac with its data in a private folder. That removes the shared-folder risks; the gaps in what support bundles hide remain whatever the deployment." Bullets lead with risks that apply to the stated deployment; a risk the context removes appears only in this line. It agrees with the Monocle Score section's **Deployment context** block (`deployment-context.md`).
 - **Monocle Score line.** Copy the score and band from the report's Monocle Score section (SKILL.md, Step 5, Monocle Score). The first number assumes the tool is deployed as the operator's Deployment Context states, or as documented when none was given. Write the condition for the alternate as the administrator action it depends on, in plain language, for example "or 25/100 (🟠 Poor) if any Self Service policy offers every action". Leave the breakdown out of this view; it has its own section. The score line doesn't count toward the 1–6 bullets.
 - **Powerful features are not defects.** When the tool can do something drastic on purpose, and administrators control whether users see it, say who controls it. Don't present it as a flaw. Write "Administrators choose which actions each policy offers; unless they do, users see every action, including removing the security agent", not "The tool lets any user remove the security agent". Save risk language for what the code itself gets wrong (SKILL.md Rule 14).
@@ -62,8 +62,8 @@ Recommendation levels:
 | Level | Use when |
 |---|---|
 | **Approve** | No Critical/High security findings; failure is low-impact and reversible |
-| **Approve with conditions** | Safe to run once specific, named fixes or controls are in place (for example, "after failures are reported correctly", "pilot on 5% of devices first", or administrator configuration from the Operator baseline such as "once every Self Service policy limits the menu"). Conditions the operator's Deployment Context already meets aren't repeated |
-| **Hold** | Material risk or unknowns that need an owner decision or more information before running |
+| **Approve with conditions** | Safe to run once specific, named fixes or controls are in place (for example, "after failures are reported correctly", "pilot on 5% of devices first", or administrator configuration from the Operator baseline such as "once every Self Service policy limits the menu"). Conditions the operator's Deployment Context already meets aren't repeated. A headline 🟠 High finding fits here only when a named fix or an Operator baseline control removes it |
+| **Hold** | Material risk or unknowns that need an owner decision or more information before running, including any headline 🟠 High finding without a named fix or control |
 | **Do not run** | A Critical security finding, likely data loss, or behavior that can't be verified (obfuscated or remote code) |
 
 ---
@@ -118,11 +118,11 @@ Why it's weak: it describes mechanism instead of purpose, uses jargon, makes vag
 ```markdown
 **In one sentence:** Sets up new Macs automatically at first login: it installs standard apps, applies security settings, and shows the user progress on screen.
 
-- **Runs with full administrator access on every new Mac.** A mistake affects every device enrolled while it's active.
-- **Contains a password for our device-management system written into the script itself.** Anyone who can read the script can copy it and use it to change settings across the fleet.
-- **Failures are hidden.** If an app fails to install, the Mac still reports "success", so gaps show up later as help desk tickets.
-- **Needs internet and one download site to be available.** If that site is down, setup stalls for new hires on day one.
-- **Maintained by one person.** No documentation or tests exist outside their knowledge.
+- **Anyone who can read the script can change settings across the whole fleet.** It contains a stored password for our device-management system.
+- **Failed installs report "success".** Gaps show up later as help desk tickets.
+- **Setup stalls for new hires on day one if one download site is down.** It needs internet access and that site.
+- **A mistake would reach every new Mac.** It runs with full administrator access on every device enrolled while it's active.
+- **One person maintains it.** No documentation or tests exist outside their knowledge.
 
 **Deployment context:** Not supplied — this rates the tool as its documentation describes deploying it.
 

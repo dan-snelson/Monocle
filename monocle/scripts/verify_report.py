@@ -545,7 +545,7 @@ def check_score(audit, report, rules):
             scored, listed = counts[sev], table_counts[sev]
             if sev == "Low" and scored == listed + 1:
                 audit.note("arithmetic", "Low count", "warn",
-                           f"one more Low scored ({scored}) than listed ({listed}); valid only for a roll-up that names a real gap")
+                           f"one more Low scored ({scored}) than listed ({listed}); every Low needs its own findings-table row (verify-report.md, Ledger checks)")
             else:
                 audit.add("arithmetic", f"{sev} count", scored == listed,
                           f"findings table lists {listed} {sev}; deduction table counts {scored}", warn_only=sev == "Info")

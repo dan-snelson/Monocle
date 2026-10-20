@@ -110,7 +110,7 @@ Extends SKILL.md Step 4, Secrets.
   - **This exposure comes from the platform, not the target's code.** Jamf Pro delivers every policy parameter as a command-line argument, and macOS lets any local user read other processes' arguments. No script can hide a value once it arrives this way. Record the finding as **Origin: Platform + Deployment** (SKILL.md Rule 13), and say so in the finding's Impact.
   - On current macOS, any local user can read root processes' full `argv`. Confirm on the analysis host with `ps -axww -o user=,args= | awk '$1=="root"' | head` run as non-root; it has worked on Darwin 25.
   - Passing the secret to `curl` over stdin (`--config -`, `-K -`) protects only the `curl` child, not the parent script.
-  - Name what the target already does about it: rejecting parameter-supplied secrets, reading them from a root-only file instead, warning in the log, or documenting the risk. Credit these in the finding, not only in the Low/Info roll-up.
+  - Name what the target already does about it: rejecting parameter-supplied secrets, reading them from a root-only file instead, warning in the log, or documenting the risk. Credit these in the finding, not only in the Credits list.
   - Separate out any part the code does add, and label it **Code**. For example, a script that rejects a parameter secret but then runs every check before exiting keeps the value exposed for minutes with no benefit.
   - Rate the finding with **Credential severity** in `security.md`: a fleet-scoped secret is High **only while a policy actually populates the parameter**. Cite the observed `ps` check and give the rating both ways (SKILL.md Rule 11). If the target documents and supports a safer delivery (a root-only secrets file, Keychain), the headline uses that documented baseline and the populated-parameter rating is the alternate. If parameters are the only way the code accepts the secret, the exposure is part of the baseline and counts in the headline.
 
@@ -124,7 +124,7 @@ A tool that never runs as root still has a trust boundary: other local accounts 
 - **Setting a mode on create doesn't enforce it.** `os.open(path, O_CREAT | O_TRUNC, 0o600)` and `umask 077; > file` apply the mode only when they create the file. A file that already exists, or that the user wrote by hand from an example, keeps its old mode. Do not flag BSD/macOS `install -m 600` for this pattern; it applies the requested mode when replacing an existing destination. Check two things:
   - whether the loader checks `st_mode & 0o077` and the owner;
   - whether the docs or the success message claim "chmod 600" unconditionally. Check that claim against the code (SKILL.md Step 4, Secrets: "Verify the target's own security claims").
-- **Severity:** Low at the documented baseline, when the tool's own setup command creates the file. Give Medium as the alternate when the docs also allow hand-writing the file and the Mac may have more than one local account (`security.md`, Credential severity: world-readable file, narrow scope).
+- **Severity:** **Credential severity** in `security.md`, per-user row, at the documented baseline, when the tool's own setup command creates the file. Give the world-readable-file row (narrow scope: Medium) as the alternate when the docs also allow hand-writing the file and the Mac may have more than one local account.
 - **Fix pattern:**
   - `mkdir(mode=0o700)` for the config directory;
   - `os.fchmod(fd, 0o600)` after opening, with `O_NOFOLLOW`;
@@ -137,9 +137,9 @@ A tool that never runs as root still has a trust boundary: other local accounts 
 
 Release CI that writes to a distribution channel (a Homebrew tap, a package repository, an update feed) is in scope (SKILL.md Step 2, item 7).
 
-- **Rating.** A deploy token passed to a third-party action pinned to a mutable tag (`@v4`) is Low (Origin: Code + Deployment). Give Medium as the alternate when the token's scope is broader than that channel. Token scope is never visible in the repo, so put it in the Operator baseline.
+- **Rating.** A deploy token passed to a third-party action pinned to a mutable tag (`@v4`) takes **Credential severity** in `security.md`, CI row: Low when the token is limited to that channel, Medium as the alternate when its scope is broader. Token scope is never visible in the repo, so put it in the Operator baseline.
 - **Fix.** Pin to the full commit SHA, use a fine-grained token limited to the channel, and add Dependabot for `github-actions`.
-- **CI without secrets.** CI jobs that hold no secrets and don't deploy, but use mutable tags, are Info and aren't scored.
+- **CI without secrets.** CI jobs that hold no secrets and don't deploy, but use mutable tags, are `X#` rows with reason code `maintainer` (`scoring-procedure.md`); give them no `S#`.
 - **Distribution manifests in other repos:** Homebrew tap formulae (`homebrew-<name>/Formula/*.rb`), pkg build repos, and Jamf script repos. They define the installed layout, the real invocation path, whether the shebang is rewritten, and which interpreter actually runs, which can differ from the one declared (for example, `depends_on "python@3.12"` with an unrewritten `#!/usr/bin/env python3`). Fetch them when that is cheap, record their SHA, and treat them as context: they are outside the target and aren't scored. If release CI writes to one, note which token it uses (see **Rating** above).
 
 ---
