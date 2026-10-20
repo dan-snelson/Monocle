@@ -329,7 +329,7 @@ A raw score above the range is **capped** at its top; a raw score below it is **
 | 25–49 | 🟠 Poor |
 | 0–24 | 🔴 Critical |
 
-**Headline and alternate.** When a finding's severity depends on deployment (Rule 11), compute the score both ways and give both. The headline rates the operator's Deployment Context when one is supplied, otherwise the documented-deployment baseline; the single alternate has every Operator baseline finding condition failing at once (Rule 14 gate bullets don't take part). `references/deployment-context.md` defines both, including "no safe path, no baseline credit" and undocumented controls.
+**Headline and alternate.** When a finding's severity depends on deployment (Rule 11), compute the score both ways and give both. The headline rates the operator's Deployment Context when one is supplied, otherwise the documented-deployment baseline; the single alternate has every Operator baseline finding condition failing at once, settings that ship off included (Rule 14 gate bullets don't take part). `references/deployment-context.md` defines both, including "no safe path, no baseline credit" and undocumented controls.
 
 **Consistency.** The band limits tie the band to the Security view's Overall risk, so only Low or better reaches Excellent. Excellent with "Hold" or "Do not run" means a severity or the recommendation is wrong; recheck them rather than changing the score.
 

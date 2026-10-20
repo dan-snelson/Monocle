@@ -137,7 +137,7 @@ Apply the reason codes first: any match makes the issue an `X#`, not scored. Oth
 
 Build both mechanically from the ledger:
 
-- **One bullet per scored finding whose headline depends on a deployment condition:** `{condition, as the documentation states it} ({doc file:line}) (S# → {severity} if not)`, or `{condition, as the operator states it} (operator-stated) (S# → {severity} if not)` when the Deployment Context sets it. The `file:line` is the line that states the condition. A nearby heading, warning, or comment is not that line. A platform default listed under Known Apple platform behaviors (`patterns.md`) counts as documented; cite the entry in place of a doc line: `{condition} (patterns.md: {entry title}) (S# → {severity} if not)`. A feature that ships off, and that an administrator must turn on before the finding applies, gets no bullet and doesn't take part in the alternate; state it in the finding's Impact. Without context, a condition with no documentation line is an undocumented control, and the headline takes the unsafe rating (`deployment-context.md`, Undocumented controls).
+- **One bullet per scored finding whose headline depends on a deployment condition:** `{condition, as the documentation states it} ({doc file:line}) (S# → {severity} if not)`, or `{condition, as the operator states it} (operator-stated) (S# → {severity} if not)` when the Deployment Context sets it. The `file:line` is the line that states the condition. A nearby heading, warning, or comment is not that line. A platform default listed under Known Apple platform behaviors (`patterns.md`) counts as documented; cite the entry in place of a doc line: `{condition} (patterns.md: {entry title}) (S# → {severity} if not)`. A setting that ships off, and that an administrator must turn on before the finding applies, counts as documented: cite the documentation line that states its default, or, when no line does, the code line that sets it. It takes part in the alternate like any other condition (`security.md`, Q3). When it is also a Rule 14 gate, the gate keeps its own bullet below. Without context, a condition with no documentation line is an undocumented control, and the headline takes the unsafe rating (`deployment-context.md`, Undocumented controls).
 - **Then one bullet per distinct admin gate** from the Rule 14 checklist, marked "(Rule 14 gate; not scored)".
 - **Order:** finding bullets by ID, then gate bullets. If both lists are empty, write "None — the score doesn't depend on deployment."
 - **One alternate only.** Assume every finding bullet's condition fails at once; the Rule 14 gate bullets don't take part. The alternate's condition text is the negation of those finding bullets. Recompute from the same ledger with the alternate severities, score every `context` row, and clamp the result the same way.
@@ -149,10 +149,10 @@ Build both mechanically from the ledger:
 Before writing any view, confirm:
 
 - Every Step 4 hit, and every bullet you plan to write, has a ledger row.
-- Every `S#` has a Severity basis. Every Info row passes the Info test in Q2 (self-scoped and backstopped rows included), or reached Info at Q3 (undeployed, or out of the Deployment Context's scope). No Low is folded into the Credits list.
+- Every `S#` has a Severity basis. Every Info row passes the Info test in Q2 (self-scoped and backstopped rows included), or reached Info at Q3 (undeployed, shipped off, or out of the Deployment Context's scope). No Low is folded into the Credits list.
 - Every Likelihood lowering, and every self-scoped and backstopped Info row, names criteria (a)–(c) from `security.md`, Likelihood, in its Severity basis.
 - Every `X#` has exactly one reason code.
 - Every row has a Context effect, and the Deployment Context was applied, asked for once, or not needed (`deployment-context.md`, Eliciting context).
 - The distinct-issue test was applied, and IDs are numbered in the fixed order.
-- The Operator baseline and the single alternate were built as described above.
+- The Operator baseline and the single alternate were built as described above. Every row whose headline Q3 lowered (settings that ship off included), and every self-scoped row with an added effect under a setting that ships off (`security.md`, Q2), has a finding bullet and an alternate severity.
 - The score was computed from the ledger.
