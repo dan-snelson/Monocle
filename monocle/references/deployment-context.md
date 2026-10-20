@@ -67,6 +67,8 @@ Ask once, at Step 5 item 1, before freezing the ledger. Name only the conditions
 > - Trust boundary: {e.g. "do other people have accounts on the Mac?"}
 > - Out of scope: anything this deployment never uses?
 
+When a deployment-dependent row lives in maintainer tooling (a release or deploy helper), ask its trust boundary as a separate question about the maintainer's machine; endpoint answers don't cover it, and the Interpretation bullet says which machine each answer applies to.
+
 With a structured-question tool, offer each condition as a choice and allow free text. On "skip" or no answer, record "None supplied" and continue at the documented baseline. Never ask twice in one run.
 
 ## What context can and can't change
