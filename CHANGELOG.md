@@ -7,7 +7,8 @@
 ### "B" as in bdellium (unreleased)
 
 - Scoring
-    - The fleet-wide raise (Adjustment 1) applies only when documentation, packaging, or the operator's Deployment Context deploys the tool fleet-wide; a Jamf policy or LaunchDaemon pkg whose scope the administrator chooses doesn't raise, and a forged reminder or report that the platform enforces anyway is never raised to High
+    - The fleet-wide raise (Adjustment 1) applies only when documentation, packaging, or the operator's Deployment Context deploys the tool fleet-wide; a Jamf policy or LaunchDaemon pkg whose scope the administrator chooses doesn't raise
+    - Severity weighs likelihood as well as impact and reachability (Rule 15, `security.md` Likelihood): improbable local abuse that crosses no privilege or account boundary is lowered one level (Adjustment 3, never below Low, and never stacked with Adjustment 2), and self-scoped tampering that a platform control enforces anyway, such as forged install.log text that only changes a DDM reminder or that Mac's own inventory, is ⚪ Info. Obscurity, required skill, and no public exploit never lower a rating, and forged text that reaches a sink keeps injection severity. Verify mode accepts these ratings when the Severity basis names the criteria
     - Adjustments never apply to Q0 outcomes, ⚪ Info rows, or rows whose headline Q3 set
     - The Q1b floor binds Q4–Q5; Q3 can still set a lower headline, and the floor applies to the alternate. Verify mode accepts Q3-lowered headlines
     - Q4 matches only on the same sink and gain; local privilege escalation is High without a race and Medium with one

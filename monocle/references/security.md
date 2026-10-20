@@ -5,6 +5,7 @@
 - Structure and tone
 - Key questions the summary must answer
 - Severity scale
+  - Likelihood
   - Decision procedure
   - Credential severity
 - Good vs weak examples
@@ -104,15 +105,28 @@ Rules:
 
 ## Severity scale
 
-Assign exactly one severity to each finding. Base it on **impact × reachability** in the code's real execution context, not on theoretical worst cases.
+Assign exactly one severity to each finding. Base it on **impact × reachability × likelihood** (see **Likelihood** below) in the code's real execution context, not on theoretical worst cases.
 
 | Severity | Criteria | Typical examples |
 |---|---|---|
 | 🔴 **Critical** | Remote or unauthenticated code execution as root, **or** a plaintext credential that grants write/admin access to a fleet-wide system and is hardcoded in the code, repo, or shipped payload (see **Credential severity**), **or** deliberate disabling of a core security control on many devices | `curl http://… \| sudo bash`; Jamf API admin creds hardcoded; `spctl --master-disable` fleet-wide |
 | 🟠 **High** | Local privilege escalation to root that needs no race (a link or file planted before the run, or a user-owned path that root executes); code injection from an attacker-influenced input; a secret with meaningful scope exposed in logs, the process list, or a world-readable file; TLS verification disabled on a download that gets executed; unverifiable (obfuscated) behavior | `eval "$4"`; root reads and executes `~/Library/…/script.sh`; `curl -k` then run; `curl -u admin:pass` visible in `ps` |
-| 🟡 **Medium** | Exploitable only with local access plus winning a race, or the impact is limited to one user or device; weak integrity checks; overly broad permissions | Predictable `/tmp/foo` written as root (clobber only); `chmod 777`; downloaded pkg installed without a signature/Team ID check; narrow or read-only credential in a Jamf param (see **Credential severity**) |
+| 🟡 **Medium** | Exploitable only with local access plus winning a race, or the security impact (code execution, data access, or loss of a control) is limited to one user or device, not a changed reminder, notice, or self-reported value; weak integrity checks; overly broad permissions | Predictable `/tmp/foo` written as root (clobber only); `chmod 777`; downloaded pkg installed without a signature/Team ID check; narrow or read-only credential in a Jamf param (see **Credential severity**) |
 | 🔵 **Low** | Defense-in-depth gaps with no clear exploit path | Missing `umask` (a root-written file left to the default mode that captures other programs' output); verbose logging of non-secret identifiers; no `--proto '=https'` on an HTTPS URL |
-| ⚪ **Info** | Observations useful for context, not risk | Uses `launchctl asuser` correctly; TLS pinned; runs read-only; a readable log holding only data local users can already read |
+| ⚪ **Info** | Observations useful for context, not risk | Uses `launchctl asuser` correctly; TLS pinned; runs read-only; a readable log holding only data local users can already read; forged install.log text that only changes a DDM reminder |
+
+### Likelihood
+
+A finding can be possible without being probable (SKILL.md Rule 15). Classify every row that needs a deliberate actor into one tier, and record the tier and the criteria it meets in the **Severity basis** line. A row whose only actor is an admin records `Likelihood: n/a (admin only)` and uses Adjustment 2 instead.
+
+- **Expected** is the default. It covers failures that happen on their own (a race that occurs in normal operation, a typo in a parameter, Q1b-type silent failures), any remote or network attacker, and any gain of root, code execution as another account, another account's data, or a secret.
+- **Improbable** applies only when all three hold:
+  - (a) the only actor is a local user acting deliberately on that Mac;
+  - (b) no privilege or account boundary is crossed: no root, no code execution as another account, no other account's data, and no secret. Changing what the tool displays in another account's session crosses no boundary;
+  - (c) the gain is no more than the tool's normal UI already gives that user (dismiss, defer, opt out), **or** a control the tool doesn't own enforces the real requirement regardless, such as DDM installing at its deadline or an MDM-installed profile, even when the forged text invents a different requirement. Cite the `patterns.md` entry for the platform control.
+- **Self-scoped and backstopped** is an Improbable row whose criterion (c) is met by a platform control, and whose effect is limited to what the tool shows, defers, or escalates for that Mac's users (including holding off its own aggressive or forced-restart modes), or reports about that Mac. Forged text that makes the tool take an action nobody requested, such as a restart, isn't self-scoped; walk it normally. Q2 rates it ⚪ Info. Example: a user appends forged lines to `/var/log/install.log` so a DDM reminder tool suppresses or misstates its reminder, or an Extension Attribute reports a wrong pending date for that Mac; DDM still installs at the deadline.
+- **Non-factors.** An undocumented format, required skill or knowledge, no public exploit, and "users wouldn't do that" never make a row Improbable. A row whose only support is one of these stays Expected.
+- Forged text that reaches a sink (`eval`, `${(P)…}`, `printf -v`, a command, or a path root writes) is rated as injection or path trust, never by this section.
 
 ### Decision procedure
 
@@ -123,6 +137,7 @@ Answer these questions in order for each ledger row (`scoring-procedure.md`) bef
 - **Q1b — Floors.** A silent failure in a security or compliance control is at least 🟡 Medium, for example a FileVault enforcement script that exits 0 on error, or a firewall-enable step whose failure is swallowed. So is non-production data that reaches production compliance records. The floor binds the Q4–Q5 rating. When Q3 finds that the deployment never runs the path or closes its precondition, Q3 sets the headline and the floor applies to the alternate.
 - **Q2 — Gain.** Name the attacker (a non-admin local user, a network attacker, or a remote party), the precondition, and the gain.
   - ⚪ **Info** applies only when the gain isn't security-relevant even with the precondition met: something cosmetic, the availability of a non-security feature, or data the attacker can already read. Credits and observations are also Info.
+  - A **self-scoped and backstopped** row (**Likelihood** above) is ⚪ Info: the actor only gives up a non-security nudge, or misreports their own Mac, while the platform still enforces the outcome. The walk ends here. The Q1b floor doesn't bind, the row has no alternate, and the code's safer source (for example, a root-owned state file) goes in **Fix** as hardening.
   - Otherwise the row is at least 🔵 Low. A security-relevant gap with a concrete code fix is never Info.
   - Rate disclosure by what the code itself writes. Treat relayed output of other programs as unknown content: 🔵 Low at most, and never assume it holds a specific secret.
   - If only an admin can trigger the gap, rate it here as if a non-admin could, then apply the lowering adjustment.
@@ -140,8 +155,11 @@ Answer these questions in order for each ledger row (`scoring-procedure.md`) bef
 
 **Adjustments.** Apply these after the walk, in this order and at most once each, and name each one in the Severity basis line. They never apply to credential findings (see **Credential severity**), to a Q0 outcome, to ⚪ Info, or to a row whose headline Q3 set.
 
-1. **Raise one level** when the target's own documentation or packaging deploys it fleet-wide by default, or the operator's Deployment Context states fleet-wide deployment, for example a pkg in the enrollment prestage, an Extension Attribute, or documentation that tells admins to scope it to All Computers. A Jamf policy or LaunchDaemon pkg whose scope the administrator chooses is not fleet-wide by default; without such documentation or Deployment Context, don't raise. The raise never lifts to 🟠 High a finding whose only effect is a forged reminder, notice, or report when the platform enforces the outcome regardless (`patterns.md`, DDM enforcement doesn't depend on reminder tools). Never raise into 🔴 Critical: only the Critical criteria give Critical.
+1. **Raise one level** when the target's own documentation or packaging deploys it fleet-wide by default, or the operator's Deployment Context states fleet-wide deployment, for example a pkg in the enrollment prestage, an Extension Attribute, or documentation that tells admins to scope it to All Computers. A Jamf policy or LaunchDaemon pkg whose scope the administrator chooses is not fleet-wide by default; without such documentation or Deployment Context, don't raise. Never raise into 🔴 Critical: only the Critical criteria give Critical.
 2. **Lower one level** when the vulnerable path requires admin access that already implies equivalent power. Say so explicitly.
+3. **Lower one level** when the row's Likelihood is Improbable (and not self-scoped and backstopped, which is already Info). Name criteria (a)–(c) in the Severity basis. This never lowers below 🔵 Low.
+
+Apply at most one lowering adjustment: 2 or 3, not both.
 
 Overall risk equals the highest headline severity, or 🔵 Low when no finding is Low or higher. When the alternate's highest severity differs, give it too.
 

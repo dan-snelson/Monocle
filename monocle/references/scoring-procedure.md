@@ -149,7 +149,8 @@ Build both mechanically from the ledger:
 Before writing any view, confirm:
 
 - Every Step 4 hit, and every bullet you plan to write, has a ledger row.
-- Every `S#` has a Severity basis. Every Info row passes the Info test in Q2, or reached Info at Q3 (undeployed, or out of the Deployment Context's scope). No Low is folded into the Credits list.
+- Every `S#` has a Severity basis. Every Info row passes the Info test in Q2 (self-scoped and backstopped rows included), or reached Info at Q3 (undeployed, or out of the Deployment Context's scope). No Low is folded into the Credits list.
+- Every Likelihood lowering, and every self-scoped and backstopped Info row, names criteria (a)–(c) from `security.md`, Likelihood, in its Severity basis.
 - Every `X#` has exactly one reason code.
 - Every row has a Context effect, and the Deployment Context was applied, asked for once, or not needed (`deployment-context.md`, Eliciting context).
 - The distinct-issue test was applied, and IDs are numbered in the fixed order.
