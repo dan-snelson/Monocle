@@ -83,7 +83,7 @@ Rules:
 - **Tone:** factual and technical. Don't use "catastrophic" or other hype. Let the severity carry the weight.
 - **Order findings by severity,** then by first `file:line` (`scoring-procedure.md`, Issue ledger).
 - **Write the Deployment context line after rating,** from each row's Context effect (`deployment-context.md`). Keep it to one to three sentences. With no context, write "None supplied — rated at the documented-deployment baseline", and name the findings an operator context could change, if any. Every finding's **Context:** line agrees with it.
-- **Give every Low or higher finding its own row and `S#`.** Merge only under the distinct-issue test (`scoring-procedure.md`). The **Credits** list holds credits only, with no ID. An ⚪ Info row keeps its `S#` and table row; write it up in full only when its alternate is Low or higher. Past 10 findings, drop the **Impact** line from each extra Low write-up; keep every other line.
+- **Give every Low or higher finding its own row and `S#`.** Merge only under the distinct-issue test (`scoring-procedure.md`). The **Credits** list holds credits only, with no ID. An ⚪ Info row keeps its `S#` and table row; write it up in full only when its alternate is Low or higher; otherwise give only its heading, **Location**, and **Severity basis** lines (a self-scoped and backstopped row names criteria (a)–(c)). Past 10 findings, drop the **Impact** line from each extra Low write-up; keep every other line.
 - **Quote evidence verbatim,** with secrets redacted to the first 4 characters plus `…`.
 - **Make fixes concrete.** "Use `curl --fail --proto '=https' --tlsv1.2`" is a fix. "Improve TLS handling" is not.
 - If nothing notable is found, still fill in the sections and write "No Critical, High, or Medium findings", with a short reason.
@@ -133,7 +133,7 @@ A finding can be possible without being probable (SKILL.md Rule 15). Classify ev
 Answer these questions in order for each ledger row (`scoring-procedure.md`) before you choose a severity, and record the path in the finding's **Severity basis** line. The first question that decides ends the walk; then apply **Adjustments**.
 
 - **Q0 — Capability?** If the row is about a high-impact operation *being available* (EDR removal, data deletion, app removal), run the Rule 14 checklist in `scoring-procedure.md` and use its outcome (SKILL.md Rule 14). Defects in how the code performs the operation skip Q0.
-- **Q1 — Credential?** Use **Credential severity** below. Its result is final; adjustments don't apply.
+- **Q1 — Credential?** Use **Credential severity** below. Its rating is final except for Q3 (see the last bullet under **Credential severity**); adjustments don't apply.
 - **Q1b — Floors.** A silent failure in a security or compliance control is at least 🟡 Medium, for example a FileVault enforcement script that exits 0 on error, or a firewall-enable step whose failure is swallowed. So is non-production data that reaches production compliance records. The floor binds the Q4–Q5 rating. When Q3 finds that the deployment never runs the path or closes its precondition, Q3 sets the headline and the floor applies to the alternate.
 - **Q2 — Gain.** Name the attacker (a non-admin local user, a network attacker, or a remote party), the precondition, and the gain.
   - ⚪ **Info** applies only when the gain isn't security-relevant even with the precondition met: something cosmetic, the availability of a non-security feature, or data the attacker can already read. Credits and observations are also Info.
@@ -181,6 +181,7 @@ Rate every credential finding with this table. Other sections of this file and o
 
 - The "raise one level for fleet-wide" adjustment above doesn't apply here; scope is already a column.
 - When the code documents and supports a safer delivery than parameters, apply SKILL.md Rule 11: the headline uses that baseline and the populated-parameter rating is the alternate. When parameters are the only way the code accepts the secret, the parameter rating is the headline.
+- When the exposure happens only under a setting that ships off (a `--debug` flag that turns on `set -x`, an `--insecure` flag that drops TLS verification) or on a path the deployment never runs, apply Q3: the headline is ⚪ Info, this table's rating is the alternate, and the row gets an Operator baseline bullet. This never applies to a credential hardcoded in the code, repo, or shipped payload, which ships whether or not the setting is on.
 
 ---
 
