@@ -92,13 +92,13 @@ The checklist decides only whether the operation *being available* is scored. De
 | C4 | Can a non-admin reach or set the gate (a user-writable config, a policy whose gate the user controls)? | Yes/No + line |
 | C5 | Does it do more than documented (for example, "remove the app suite" also deleting data that sibling products keep in the same vendor folder)? | Yes/No + line |
 | C6 | Does the code defeat the gate (a wrapper that drops `"$@"`, a gate read after the action)? | Yes/No + line |
-| C7 | With the gate blank or unset, does it offer nothing or a safe minimum, or everything? | Safe / Everything + line |
+| C7 | With the gate blank or unset, does it offer nothing or a safe minimum, or everything? Answer for every mode that offers the operation: a gate the code enforces only in its default mode can offer everything in the others | Safe / Everything + line, per mode |
 | C8 | With a non-blank invalid value (typo, wrong case, unknown word), is it rejected, or does it fall through to a high-impact branch? | Rejected / Falls through + line |
 
 | Answers | Disposition |
 |---|---|
 | C1–C3 yes; C4–C6 no; C7 safe; C8 rejected | Not scored (reason code `capability`). Add one Operator baseline bullet per distinct admin gate, marked "(Rule 14 gate; not scored)" |
-| As above, but C7 is "everything" | 🔵 Low secure-default gap (Origin: Code + Deployment). For the alternate, rate the operation with the Decision procedure, Q2–Q5, with this precondition met: "the gate is blank in a policy the documented audience can run" |
+| As above, but C7 is "everything" | 🔵 Low secure-default gap (Origin: Code + Deployment). For the alternate, rate the operation with the Decision procedure, Q2–Q5, with this precondition met: "the gate is blank in a policy the documented audience can run". A standard user reaching a root-only removal (an EDR agent, the app suite) rates as privilege escalation for that operation: 🟠 High (`scoring-example.md`) |
 | As above, but C8 falls through | The same as C7 "everything" when only an admin sets the value. Full severity from Q2–Q5 when a non-admin can influence it |
 | C1, C2, or C3 no; or C4, C5, or C6 yes | Not a capability. Rate it with the Decision procedure, Q1–Q5, on its real exposure |
 
