@@ -543,12 +543,8 @@ def check_score(audit, report, rules):
                 table_sev[row[0].strip()] = sev
         for sev in SEVERITIES:
             scored, listed = counts[sev], table_counts[sev]
-            if sev == "Low" and scored == listed + 1:
-                audit.note("arithmetic", "Low count", "warn",
-                           f"one more Low scored ({scored}) than listed ({listed}); valid only for a roll-up that names a real gap")
-            else:
-                audit.add("arithmetic", f"{sev} count", scored == listed,
-                          f"findings table lists {listed} {sev}; deduction table counts {scored}", warn_only=sev == "Info")
+            audit.add("arithmetic", f"{sev} count", scored == listed,
+                      f"findings table lists {listed} {sev}; deduction table counts {scored}", warn_only=sev == "Info")
             for finding_id in rows[sev].ids if sev in rows else []:
                 if finding_id in table_sev and table_sev[finding_id] != sev:
                     audit.add("arithmetic", f"{finding_id} severity", False,

@@ -1,8 +1,16 @@
 # 🔍 Pattern Quick Reference
 
+## Contents
+- Purpose
+- Jamf / macOS notes
+  - Security checks
+  - Engineer checks
+  - Manager checks
+- Known Apple platform behaviors
+
 ## Purpose
 
-A lookup table of common Jamf, macOS, and Python patterns, with why each matters and which views it usually feeds. Load it during SKILL.md Step 4 and while building the fact sheet in Step 3. Each hit belongs in the fact sheet with `file:line`. The table is a spotting aid, not a checklist: Step 4 stays mandatory, and every hit still needs confirming in the code. The **Known Apple platform behaviors** list at the end is what SKILL.md Rule 13 cites: check it before naming a Platform origin.
+A lookup table of common Jamf, macOS, and Python patterns, with why each matters and which views it usually feeds. Load it at SKILL.md Step 3, before the fact sheet; Step 4 uses it too. Each hit belongs in the fact sheet with `file:line`. The table is a spotting aid, not a checklist: Step 4 stays mandatory, and every hit still needs confirming in the code.
 
 ---
 
@@ -11,12 +19,11 @@ A lookup table of common Jamf, macOS, and Python patterns, with why each matters
 | Jamf policy script (runs as root, `$1`–`$3` reserved) | Every command runs with full privileges | Security, Engineer |
 | `$4`–`$11` used for credentials | Visible in the Jamf UI, and in `ps` `argv` to every local user for the whole run, even when the script hands them to `curl` over stdin. Origin is Platform + Deployment (Rule 13): Jamf's delivery mechanism, not a code defect | Security |
 | Wrapper or pkg `postinstall` runs the script without `"$@"` | Jamf params silently dropped; every default applies (for example, reporting stays in `test`) | Manager, Engineer |
-| Script copies `${0:A}` into `/Library/…` plus a root LaunchDaemon | If any deploy path launches it from `/var/tmp` or another user-writable location, the persistent root copy is attacker-controlled | Security, Executive |
+| Script copies itself (`${0:A}`) into `/Library/…` plus a root LaunchDaemon | Persistence; if any deploy path launches it from `/var/tmp` or another user-writable location, the persistent root copy is attacker-controlled | Security, Executive, Manager |
 | Test / Development / Debug mode writes the same canonical report or cache as production | Synthetic results later uploaded as real compliance data | Security, Manager |
 | Root `PATH` includes `/usr/local/bin`, or calls `/usr/local/bin/<tool>` | Intel Homebrew makes it user-owned; binary swap gives root | Security |
 | `rm -f /var/tmp/prefix_*` glob in cleanup | Deletes concurrent instances' files (a Silent policy run alongside a Self Service run); their UI or state breaks mid-run. Not a security issue | Engineer |
 | Webhook or API `curl` POST without `--fail` | HTTP errors logged as success | Engineer |
-| README or CHANGELOG security claims ("no longer in process list") | Claims, not evidence; verify against code | Security |
 | `loggedInUser=$(stat -f%Su /dev/console)` with no `loginwindow`/`_mbsetupuser` check | Breaks at the login window and during Setup Assistant | Engineer |
 | `sudo -u "$user" command` without `launchctl asuser` | Runs in the wrong GUI session; UI and `defaults` calls may silently fail | Engineer |
 | `curl … \| bash` / `sh -c "$(curl …)"` | Remote code execution as root; integrity depends on the remote host | Security, Executive |
@@ -35,13 +42,13 @@ A lookup table of common Jamf, macOS, and Python patterns, with why each matters
 | `base64 -d > /var/tmp/x.zsh; zsh /var/tmp/x.zsh` (self-extracting wrapper) | Race between write and execute gives root | Security |
 | `curl --header "Authorization: … ${token}"` | Token visible in `ps` for the whole request | Security |
 | `[[ $4 == Debug ]] && set -x` | Every param, including secrets, lands in the Jamf policy log | Security |
-| Script installs a copy of itself plus a root LaunchDaemon | Persistence; the copy becomes a privilege-escalation target | Security, Manager |
 | Client copy built by `awk`/`sed` edits to its own source | Breaks silently when comments or list order change; check whether the substitution result is verified (`grep -qF`, `zsh -n`). Better fix: pass the mode as LaunchDaemon `ProgramArguments` and guard on an env var instead of editing the source | Manager, Engineer |
-| Cache or self-update gated on the `scriptVersion=` string only | Edits without a version bump never deploy. It becomes permanent when the fast-path `exit` comes before the reinstall step and a nightly job keeps the cache fresh | Manager, Engineer |
+| Cache or self-update gated on the `scriptVersion=` string only | Edits without a version bump never deploy. It becomes permanent when the fast-path `exit` comes before the reinstall step and a nightly job keeps the cache fresh; security fixes credited by a review may never reach devices. Evidence: `git log -10 --format='%h %ad %s' --date=short` shows several commits under one version | Manager, Engineer |
 | External check or EA runs `defaults write /Library/Preferences/.GlobalPreferences.plist` | Permanent, user-visible system change from a read-only-looking check. A "temporary" change restored only by `trap … EXIT` persists after SIGKILL, a crash, or power loss | Executive, Manager |
-| pkg payload in `/usr/local/bin` that `postinstall` then runs | Root runs a file in a directory that may be user-owned (Intel Homebrew) | Security |
+| pkg payload in `/usr/local/bin` that `postinstall` then runs | Root runs a file in a directory that may be user-owned (Intel Homebrew). A trusted-path check before a self-copy protects the persistent copy, not this immediate root run | Security |
 | `pgrep -a "Name"` then `kill "$pids"` | Substring match kills other tools' processes; several PIDs in one quoted argument give `kill: illegal pid`, so nothing is killed | Engineer |
 | `pkill -9 'Sync'` / `pkill -9 'Agent'` (a short or generic name) without `-x` | Matches any process whose name contains the string, including other vendors' extensions | Engineer |
+| Root `pkill` / `pgrep -x` without `-u` in a per-user reset or removal | Matches every account's processes: `pgrep -x` run as a standard user listed root-owned daemons, and `-u "$(id -u)"` excluded them (Darwin 25). With fast user switching, a reset force-quits another logged-in user's apps without saving, and a `while pgrep …` wait can block forever on a process the console user can't quit. Fix: `-u "$uid"` on user-app stops and waits; leave stops of root-owned helpers unscoped | Engineer, Manager |
 | `launchctl asuser … "$@"` with fallback to `sudo -u … "$@"` on any non-zero exit | Every legitimately failing command (for example, `security find-generic-password` returning 44) runs twice, the second time outside the GUI session; prompts and `open` can fire twice | Engineer |
 | `is-at-least "$min" "$ver"` with `$ver` possibly empty | Inconsistent: `is-at-least 15.5 ""` is false but `is-at-least 2.0.0.100 ""` is true (zsh 5.9). Empty versions from an unreadable `Info.plist` pick the wrong branch, for example a legacy reinstall, or they pass a version gate | Engineer |
 | `codesign -dv … \| awk '/TeamIdentifier/'` as a trust check | Displays the embedded Team ID without validating the signature; use `codesign --verify --strict -R='anchor apple generic and certificate leaf[subject.OU] = "TEAMID"'` | Security |
@@ -53,7 +60,7 @@ A lookup table of common Jamf, macOS, and Python patterns, with why each matters
 | Persistent job runs `networkQuality`, `softwareupdate --list`, or chained `jamf policy` nightly | Fleet-wide bandwidth and Jamf load within the jitter window, and again on wake | Executive, Manager |
 | App bundle copied and re-signed ad hoc (`codesign --force --sign -`) | Loses its Team ID, so PPPC/TCC profiles keyed to the vendor stop matching | Engineer |
 | JSON payload built by heredoc interpolation | A `"` in a hostname breaks the payload silently; prefer `jq -n --arg` | Engineer |
-| Heavy discovery (`system_profiler`, disk-wide `mdfind`) before a root check or cache exit | Wasted runtime; noisy errors when not run as root | Engineer |
+| Heavy discovery (`system_profiler`, disk-wide `mdfind`) before a root check or cache exit | Wasted runtime; noisy errors when not run as root. In a Jamf policy it also keeps `$4`–`$11` readable in `argv` longer before the fast-path exit | Engineer; Security when a parameter carries a secret |
 | `jamf recon` / `jamf policy -event` calls | Chained policies; hidden dependency and runtime | Manager, Engineer |
 | `profiles`, `security`, `dscl`, `sysadminctl`, `fdesetup` | Identity, credential, or encryption changes | Security, Executive |
 | `launchctl load` / `bootstrap` + plist write | Persistence | Security, Manager |
@@ -64,13 +71,14 @@ A lookup table of common Jamf, macOS, and Python patterns, with why each matters
 | Hardcoded `jss.example.com` / org-specific URLs | Environment coupling | Manager |
 | `swiftDialog` (`/usr/local/bin/dialog`) dependency | External binary; version drift | Manager, Engineer |
 | `smtplib` / `imaplib` / `poplib` / `ftplib` TLS without `context=` | Python's default context is `CERT_NONE` with no hostname check, so credentials go to any server that answers (SKILL.md Step 4, Secrets: Library TLS defaults) | Security |
-| Network call without a timeout in a scheduled job (`smtplib.SMTP(host, port)`, `urlopen(req)`, `curl` without `--max-time`) | Python's `smtplib`, `imaplib`, `ftplib`, raw `socket`, and `urlopen` without `timeout=` inherit `socket.getdefaulttimeout()`, which is `None`. A stalled server blocks forever; launchd won't start the next interval while the job is alive, so the schedule silently stops | Engineer, Manager |
+| Network call without a timeout in a scheduled job (`smtplib.SMTP(host, port)`, `urlopen(req)`, `curl` without `--max-time`) | Python's `smtplib`, `imaplib`, `ftplib`, raw `socket`, and `urlopen` without `timeout=` inherit `socket.getdefaulttimeout()`, which is `None`. A stalled server blocks forever; launchd won't start the next interval while the job is alive, so the schedule silently stops. Fix: one module constant (`TIMEOUT_S = 30`) passed to every network call | Engineer, Manager |
 | `os.open(path, O_CREAT, 0o600)` or `umask 077; > file` presented as "chmod 600" | The mode applies only on creation; an existing or hand-written file keeps `0644`, which other local accounts can read under a `staff`-group home | Security |
+| Log file created and given its mode before preferences load, then a preference selects a different log path | The selected log takes the default mode and owner; check what sets the mode of each path a preference can choose | Security, Engineer |
 | Hardcoded launchd `PATH` without `/usr/local/bin` | Breaks Intel Homebrew; even when the code finds `brew` by absolute path, `brew doctor` fails on every scheduled run ("Homebrew's "bin" was not found in your PATH") | Engineer |
 | Legacy `launchctl load` / `unload` | Exit status isn't a reliable success signal, so "schedule installed" can print when nothing loaded; use `bootstrap`/`bootout` against `gui/$UID` (or `system`) and verify with `launchctl print`. Label it inferred unless you observed the failure | Engineer |
 | Release workflow passes a deploy token (tap, package repo, update feed) to a third-party action at a mutable tag | Repointed tag steals the token and ships code to every user; worse when the tool upgrades itself on a schedule | Security |
 | `${(P)var}` or `printf -v "$var"` where `var` is built from user-controlled input (for example, the console user's language or another per-user preference read by root) | Subscript `$(…)` runs as root (`(P)` when the base variable is set, `printf -v` always); case folding doesn't stop it on case-insensitive APFS | Security |
-| Root matches substrings in `/var/log/install.log` (or another syslog file) to decide state | Unprivileged `logger -p install.<level>` appends lines there; forged entries change what root decides and what inventory reports | Security, Engineer |
+| Root matches substrings in `/var/log/install.log` (or another syslog file) to decide state | Unprivileged `logger -p install.<level>` appends lines there; forged entries change what root decides and what inventory reports. Rate by effect (SKILL.md Rule 15): ⚪ Info when only a reminder or that Mac's own inventory changes and DDM still enforces; injection severity when the text reaches a sink | Security, Engineer |
 | Unified log `process ==` used as trust proof | Filters by executable name, not authenticated sender identity. Use it as one clue, not proof; prefer root-owned state or an API that exposes authenticated state | Security |
 | `until <app is running>; do sleep …; done` with no counter in a scheduled root job that holds a PID lock | One stuck run blocks every later run until reboot, with no error | Engineer, Manager |
 | Root ownership walk up a path with `stat -f '%Su'`/`'%Lp'` (no `-L`) and `${p:h}`, rejecting only a symlinked leaf | A symlinked intermediate directory reports the link's own owner and mode (typically `root 755`), and the textual walk never visits the real parent of its target, so a root-owned link into a user-writable directory passes (zsh 5.9, Darwin 25). Fix: reject when `${p:A}` differs from `p` (paths under `/var` or `/tmp` must then be written `/private/…`), or walk and execute `${p:A}` | Security |
@@ -79,16 +87,48 @@ A lookup table of common Jamf, macOS, and Python patterns, with why each matters
 
 ---
 
+## Jamf / macOS notes
+
+Checks for Jamf policy scripts, Extension Attributes, and macOS automation, grouped by the view their hits usually feed.
+
+### Security checks
+
+- **Params `$4`–`$11`** are visible to anyone with policy read access in Jamf Pro, and to every local user through the script's `argv` (`specialized-checks.md`, Jamf parameter secrets). Rate credentials there with **Credential severity** in `security.md`.
+- **Bearer-token handling:** check that tokens are invalidated (`/api/v1/auth/invalidate-token`) and not written to disk.
+- **Extension Attributes** run as root on every recon. Keep them read-only; any write is a finding.
+- **`jamf` binary calls** (`jamf policy -event`, `jamf recon`, `jamf manage`) can chain into other root code. Note the dependency.
+- **Security-control changes:** `spctl`, `csrutil`, `fdesetup`, `socketfilterfw`, `profiles remove`, `tccutil reset`, `dscl . -append /Groups/admin`, `sysadminctl -addUser`, and `/etc/sudoers` or `/etc/sudoers.d/` edits.
+- **Downloaded pkgs/apps** without `pkgutil --check-signature` or `spctl -a -vv` / Team ID verification before install.
+
+### Engineer checks
+
+- **Parameters:** `$1` is the mount point, `$2` the computer name, `$3` the username (often empty outside login triggers). `$4`–`$11` are custom. Check for defaults (`${4:-default}`) and validation.
+- **Console user:** the robust pattern is `scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/ && ! /loginwindow/ { print $3 }'`, or `stat -f%Su /dev/console` plus explicit `loginwindow`/`_mbsetupuser`/`root` checks.
+- **Extension Attributes:** must print `<result>…</result>` on every path, including errors, and must be fast and read-only.
+- **Logging:** prefer a consistent log function writing to a known path (for example `/var/log/org.example.script.log`) with timestamps. `echo` goes to the Jamf policy log only.
+- **`PATH`:** Jamf runs with a minimal `PATH`. Use absolute paths to binaries, or set `PATH` explicitly at the top.
+- **Architecture:** use `arch`/`uname -m` or `sysctl -n machdep.cpu.brand_string`, and handle Homebrew paths for both `/opt/homebrew` and `/usr/local`.
+
+### Manager checks
+
+- **Hidden dependencies:** Jamf policies called by custom trigger, smart groups, Extension Attributes, configuration profiles (PPPC/TCC), and the scripts' parameter labels in the Jamf UI. None of these are visible in the code, so list them.
+- **OS-upgrade exposure:** note `sw_vers` checks, deprecated tools (`kextload`, `systemsetup` quirks, `python` 2, `profiles -I`), and hardcoded OS version lists.
+- **Blast radius:** scope is set in Jamf, not in code. When unknown, say "Scope not visible in code — confirm in Jamf Pro before changing".
+
+---
+
 ## Known Apple platform behaviors
 
-Extends SKILL.md Rule 13. Check this list before naming a Platform origin, and cite the entry rather than re-deriving it. Add a new entry only after an isolated check (SKILL.md Rule 4), host evidence such as `ls -l` on a root-owned file, or Apple documentation.
+Extends SKILL.md Rule 13.
 
 - **install.log is user-writable, sender tag included.** Any local user can append to `/var/log/install.log` with `logger -p install.<level>`, and the line gets a normal syslog timestamp. `-t softwareupdated -i` produces a `softwareupdated[<pid>]:` prefix, so a sender regex on that log matches forged lines (Darwin 25). Root code that matches substrings or sender tags there trusts text any local user can write.
 - **Unified-log process predicates aren't authentication.** `process == "softwareupdated"` narrows rows by executable name only.
 - **DDM update state has a root-written source.** `/var/db/softwareupdate/SoftwareUpdateDDMStatePersistence.plist` (`_softwareupdate:_softwareupdate 0644`) holds `TargetOSVersion` and `TargetLocalDateTime` for active declarations. Prefer it over install.log text. Its layout and the install.log wording are undocumented Apple internals that can change between releases, so flag a parser that fails closed when they do.
-- **DDM enforcement doesn't depend on reminder tools.** Apple installs at the declared deadline whatever a third-party reminder does. Bypassing a reminder weakens the nudge and any admin escalation (a SKILL.md Rule 14 gate), not the enforcement. Reflect that in the severity and the Executive wording.
+- **DDM enforcement doesn't depend on reminder tools.** Apple installs at the declared deadline whatever a third-party reminder does. Bypassing a reminder weakens the nudge and any admin escalation (a SKILL.md Rule 14 gate), not the enforcement. A local user who forges or suppresses only their own Mac's reminder or inventory is self-scoped and backstopped, so the row is ⚪ Info (`security.md`, Likelihood). The Executive view calls it "possible, not probable".
 - **Process arguments are visible to every local user.** `ps` shows each process's `argv`, so Jamf `$4`–`$11` stay readable for the whole run.
-- **Intel `/usr/local/bin` can be user-owned.** Intel Homebrew chowns it to the installing user, who keeps ownership after being demoted to standard. Apple silicon Homebrew uses `/opt/homebrew`, leaving `/usr/local/bin` root-owned. On Intel, `/usr/local/bin/brew` is a symlink into `/usr/local/Homebrew/bin/`.
+- **`nscurl` doesn't enforce ATS or limit redirect protocols.** `/usr/bin/nscurl` loaded a plain `http://` URL and followed an https→http redirect. It follows redirects by default, and `--ignore-location` is its only redirect control (Darwin 25). `curl -L` also follows https→http redirects; `--proto '=https' --proto-redir '=https'` stopped one with exit 1 (curl 8.7.1). An `https://` check on the first URL doesn't cover later hops, so check each `Location:` hop.
+- **`pkgutil --check-signature` reports notarization.** For a notarized Developer ID package, it prints `Notarization: trusted by the Apple notary service` after the `Status:` line (Darwin 25). A signer check that already parses this output can require notarization without a separate `spctl` call.
+- **Intel `/usr/local/bin` can be user-owned.** Intel Homebrew chowns it to the installing user, who keeps ownership after being demoted to standard. Apple silicon Homebrew uses `/opt/homebrew`, leaving `/usr/local/bin` root-owned. On Intel, `/usr/local/bin/brew` is a symlink into `/usr/local/Homebrew/bin/`, so a prefix derived by resolving the `brew` path (for example, Python's `Path(brew).resolve()`) is wrong there; use `brew --prefix`.
 - **`/opt/homebrew/bin` belongs to the installing account.** `/opt/homebrew` is `root:wheel`, but its `bin` is owned by the account that installed Homebrew (Darwin 25). A per-user tool that prefers `/opt/homebrew/bin/<tool>` for a binary it hands secrets to trusts that account's write access; root code doing the same trusts a non-root user.
 - **In-place overwrite keeps inode, size, and mtime.** Writing over a file without truncating (`1<>` in the shell, `O_WRONLY` without `O_TRUNC`) keeps its inode and size, and `touch -t`/`touch -r` restores mtime; only ctime changes (Darwin 25). An approval cache keyed on path, size, mtime, and inode misses the change; add ctime.
 - **Hard links cross ownership.** A standard user can hard-link a root-owned file on the same APFS volume; `/Users`, `/Library`, `/private/etc`, and `/private/tmp` share the Data volume (Darwin 25).
@@ -97,3 +137,4 @@ Extends SKILL.md Rule 13. Check this list before naming a Platform origin, and c
 - **Bundled tools.** `python3` is no longer bundled; `/usr/bin/jq` ships only on macOS 15+.
 - **APFS is case-insensitive by default.** `Id` resolves to `/usr/bin/id`.
 - **Console-user placeholders.** With no one logged in, the console user reads `loginwindow`; during Setup Assistant, `_mbsetupuser`.
+- **Empty collections are not failed reads.** `PlistBuddy -c 'Print :Items'` exits 1 when the file is missing or the key is absent, and exits 0 when a present file's `Items` value is an empty dict or an empty array (Darwin 25). Don't describe those results as one branch. A failed read and an empty collection can take opposite branches. Confirm that handling with an isolated check before writing it.

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-How to cover a target that is over the SKILL.md Step 2 limits, or a single file too large to read top to bottom. Load this file when Step 2 says the target is oversized. Never skip an oversized file, and never imply full coverage.
+How to cover a target that is over the SKILL.md Step 2 limits, or a single file over 5,000 lines. Load this file when Step 2 says the target is oversized. Never skip an oversized file, and never imply full coverage.
 
 ---
 

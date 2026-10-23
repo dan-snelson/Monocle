@@ -11,11 +11,6 @@
 - Good vs weak examples
   - Weak
   - Good
-- Language notes
-  - Shell (sh / bash / zsh)
-  - Python
-  - AppleScript
-  - Jamf / macOS
 
 ## Purpose
 
@@ -162,30 +157,3 @@ Why it's weak: no evidence, no reasons, and action items without owners, effort,
 | 5 | Add a second maintainer; document the dependent Jamf policies | Service owner | M | P2 |
 | 6 | Add a `--dry-run` mode for pre-release testing | Mac engineer | M | P3 |
 ```
-
----
-
-## Language notes
-
-### Shell (sh / bash / zsh)
-
-- Check the header block for author, version, and changelog. Mac admin scripts commonly carry `# Version`, `# Author`, and `# Changelog` headers. Stale ones (the version string doesn't match the changelog) are a maintenance signal.
-- A long single-file script (over 500 lines) with no functions means high change risk.
-- Note hardcoded org values (URLs, org names, support phone numbers, Jamf server URLs) as coupling that needs a change when environments differ.
-
-### Python
-
-- Check for `requirements.txt`/`pyproject.toml`. Missing or unpinned dependencies are a fragility risk.
-- Note the interpreter source: system `python3` needs the CLT, and a bundled one (such as MacAdmins Python) is a dependency to track.
-- If tests exist (`tests/`, `pytest`), note coverage of the risky paths, not just their presence.
-
-### AppleScript
-
-- `.scpt` files are compiled and hard to diff or review in git. Recommend storing `.applescript` source instead.
-- Dependence on UI scripting (`System Events`, clicking menu items by name) breaks with app updates and localization. Rate it high fragility.
-
-### Jamf / macOS
-
-- **Hidden dependencies:** Jamf policies called by custom trigger, smart groups, Extension Attributes, configuration profiles (PPPC/TCC), and the scripts' parameter labels in the Jamf UI. None of these are visible in the code, so list them.
-- **OS-upgrade exposure:** note `sw_vers` checks, deprecated tools (`kextload`, `systemsetup` quirks, `python` 2, `profiles -I`), and hardcoded OS version lists.
-- **Blast radius:** scope is set in Jamf, not in code. When unknown, say "Scope not visible in code — confirm in Jamf Pro before changing".
