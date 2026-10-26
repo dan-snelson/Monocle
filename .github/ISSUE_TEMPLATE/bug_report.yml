@@ -23,7 +23,7 @@ body:
     attributes:
       label: Before you submit
       options:
-        - label: I reproduced this with a current copy of `monocle/` from `main` or `development`
+        - label: I reproduced this with a current copy of `monocle/` from the latest [release](https://github.com/dan-snelson/Monocle/releases), `main`, or `development`
           required: true
         - label: I removed secrets, hostnames, usernames, and other identifying details from everything below
           required: true
@@ -34,7 +34,7 @@ body:
     id: monocle-commit
     attributes:
       label: Monocle commit
-      description: From `git -C /path/to/Monocle rev-parse --short HEAD`, or the commit you copied `monocle/` from.
+      description: From `git -C /path/to/Monocle rev-parse --short HEAD`, the commit you copied `monocle/` from, or the **Commit** listed on the release you downloaded.
       placeholder: "e.g. 55ec8fb"
     validations:
       required: true
@@ -71,6 +71,7 @@ body:
     attributes:
       label: How is Monocle installed?
       options:
+        - Downloaded a release zip from GitHub Releases
         - Copied into a personal skills directory (`cp -Rv monocle ...`)
         - Symlinked to a checkout of this repo (`ln -s ...`)
         - Project- or repo-scoped skills directory
@@ -113,11 +114,14 @@ body:
         - Input detection / GitHub fetch
         - Scoping / large targets
         - Findings accuracy (false positive or missed issue)
+        - Language checks (lang-shell.md, lang-python.md, lang-swift.md, lang-applescript.md)
+        - Severity rating (Decision procedure, likelihood, adjustments)
         - Monocle Score calculation / bands
         - Deployment Context handling
         - Executive, Security, Manager, or Engineer view content
         - Semgrep scan
         - Report writing / reports directory
+        - Verify mode / verify_report.py
         - post-chat-refine
         - Other / not sure
     validations:

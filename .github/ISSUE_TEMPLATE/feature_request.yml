@@ -44,9 +44,10 @@ body:
       label: Which part of the project would this affect most?
       options:
         - New language or script type support
-        - New check or pattern (patterns.md, specialized-checks.md)
+        - New check or pattern (patterns.md, specialized-checks.md, lang-*.md)
         - Executive, Security, Manager, or Engineer views
         - Monocle Score / scoring rules
+        - Deployment Context
         - Input handling (GitHub URLs, bundles, large targets)
         - Automated scanning (Semgrep)
         - Report output / location
