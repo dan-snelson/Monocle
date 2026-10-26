@@ -6,7 +6,7 @@ You are welcome to discuss ideas, bugs, and improvements in the [Issues](https:/
 
 ## Pull Requests
 
-Submit Pull Requests against the `development` branch unless requested otherwise. The `main` branch is the current stable line.
+Submit Pull Requests against the `development` branch unless requested otherwise. The `main` branch is the current stable line, currently: `"B" as in bdellium`
 
 When submitting a Pull Request:
 
