@@ -27,7 +27,7 @@ A fully worked Monocle Score calculation for SKILL.md Step 5. It shows the issue
   - X3, README drift (`docs`)
   - X4, a restart deferred to the next login, which the README and the completion dialog state (`documented`)
 - **Headline:** 100 − 61 = **39/100 (🟠 Poor)**. The High range (25–69) doesn't bind.
-- **Alternate:** every Operator baseline condition that flips a finding fails at once: some interactive policy leaves the allowlist blank, `/usr/local/bin` is user-owned, and the wrapper is deployed. Then S3 is High (Q5: a standard user runs a root-only removal, rated as privilege escalation for that operation), S4 High (Q4: root runs a binary a standard user can replace; no race), and S8 Medium (Q4: root writes a fixed shared path and runs it; a race): 100 − (85 + 18) leaves 0, **floored at 25 → 25/100 (🟠 Poor)**.
+- **Alternate:** every Operator baseline condition that flips a finding fails at once: some interactive policy leaves the allowlist blank, `/usr/local/bin` is user-owned, and the wrapper is deployed. Then S3 is High (Q5: a standard user runs a root-only removal, rated as privilege escalation for that operation), S4 High (Q4: root runs a binary a standard user can replace; no race), and S8 Medium (Q5: root writes a fixed shared path and runs it; a pre-planted file still needs a rewrite between root's write and run, so High's no-race test fails and Medium's race criterion matches): 100 − (85 + 18) leaves 0, **floored at 25 → 25/100 (🟠 Poor)**.
 - **Operator baseline:**
   - Every interactive policy sets an allowlist that excludes EDR removal (README.md:{n}) (S3 → High if not).
   - `/usr/local/bin` is root-owned on every Mac in scope (patterns.md: Intel `/usr/local/bin` can be user-owned) (S4 → High if not).
