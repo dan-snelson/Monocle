@@ -4,6 +4,34 @@
 
 ## Version History
 
+### "B" as in bdellium (23-Oct-2026)
+
+- Scoring
+    - The fleet-wide raise (Adjustment 1) applies only when documentation, packaging, or the operator's Deployment Context deploys the tool fleet-wide; a Jamf policy or LaunchDaemon pkg whose scope the administrator chooses doesn't raise
+    - Severity weighs likelihood as well as impact and reachability (Rule 15, `security.md` Likelihood): improbable local abuse that crosses no privilege or account boundary is lowered one level (Adjustment 3, never below Low, and never stacked with Adjustment 2), and self-scoped tampering that a platform control enforces anyway, such as forged install.log text that only changes a DDM reminder or that Mac's own inventory, is ⚪ Info. Obscurity, required skill, and no public exploit never lower a rating, and forged text that reaches a sink keeps injection severity. Verify mode accepts these ratings when the Severity basis names the criteria
+    - Adjustments never apply to Q0 outcomes, ⚪ Info rows, or rows whose headline Q3 set
+    - The Q1b floor binds Q4–Q5; Q3 can still set a lower headline, and the floor applies to the alternate. Verify mode accepts Q3-lowered headlines
+    - Q4 matches only on the same sink and gain; local privilege escalation is High without a race and Medium with one
+    - Credential severity gains rows for per-user home files, CI secrets passed to mutable-tag actions, and credentials sent without TLS verification; AppleScript `password` literals follow its scope column instead of always rating Critical
+    - Weak integrity check: a missing Gatekeeper, notarization, or revocation verdict stays its own Low even when the vendor pin is credited; an installed binary accepted on version alone is its own row
+    - Platform defaults in Known Apple platform behaviors count as the documented baseline and are cited by entry
+    - Operator baseline bullets cite the line that states the condition; documented and operator-stated conditions are read by their evident scope
+    - A setting that ships off (a `--debug` or `--insecure` flag, a mode that defaults to `Off`) rates ⚪ Info at Q3 (credential rows included, except hardcoded credentials), gets an Operator baseline bullet citing its default, and takes part in the alternate, as Q3 already said. A self-scoped and backstopped row whose opt-in mode adds an effect that isn't self-scoped, such as a Force restart, keeps its Info headline and takes that effect as its alternate. Verify mode treats both as disclosed, not softened
+    - SKILL.md's alternate definition matches scoring-procedure.md: Rule 14 gate bullets don't take part
+    - Exit-0 reporting modes are scored unless they pass the `documented` reason-code test
+    - Non-security issues that fail inclusion test 1 or 2 take `maintainer`, `inferred-unverified`, or `unreachable`; `unreachable` covers code no documented path runs
+    - Overall risk is 🔵 Low when no finding is Low or higher; Info rows keep an `S#` and table row, and the Security view's new **Credits** list holds credits only
+    - Rule 14 checklist C7 is answered for every mode that offers the operation, since a gate enforced only in the default mode can offer everything in the others; a standard user reaching a root-only removal (an EDR agent, the app suite) rates as 🟠 High privilege escalation for the alternate
+    - A suite-removal action that deletes a shared updater, helper daemon, or receipt that kept products depend on is Rule 14 C5 ("does more than documented"), even when the documentation calls it suite-owned; 🔵 Low when the kept product still runs and only its updates stop
+- Language checks moved from the view references into `references/lang-shell.md`, `lang-python.md`, `lang-swift.md`, and `lang-applescript.md`, loaded at Step 4 by detected language, so subset and full runs build the same ledger; Jamf / macOS notes moved to `references/patterns.md`
+- Size limits are exact (30 source files, 5,000 lines, or one file over 5,000 lines); a headline High finding gives "Approve with conditions" only with a named fix or control
+- Reports are written inside a git repo only when the path is gitignored; pass 2 and the self-check run on the saved report before the reply, which freezes it
+- Executive view names who set a requirement once, and uses "could" for outcomes that need an uncommon precondition; corrected Good examples in the Executive, Security, and Engineer references and the worked score example
+- Fact sheet and Step 4 trimmed where `patterns.md`, `security.md`, or `specialized-checks.md` already hold the check; Known Apple platform behaviors adds PlistBuddy's empty-collection vs failed-read exit codes; the trimmed `argv`-exposure, installer-payload, and Homebrew-prefix notes moved to `patterns.md`
+- `patterns.md` adds fail-open on/off toggles ("defaulting to true"), root ownership walks that miss a symlinked intermediate directory, and `NO_CLOBBER` writes that open a raced-in FIFO, and root `pkill` / `pgrep -x` without `-u` in a per-user reset or removal; Known Apple platform behaviors adds that `nscurl` doesn't enforce ATS or limit redirect protocols (check every `Location:` hop) and that `pkgutil --check-signature` reports notarization
+- Deployment Context asks the trust boundary of maintainer tooling as a separate question about the maintainer's machine; a prior report with a different scope labels findings "previously out of scope"
+- Deployment Context combines with the code's own gates: a stated configuration that makes the code fail closed moves only the rows whose precondition it negates, and code-origin defects keep their severity. A single-file review still takes its documented baseline from the repo's documentation, asked once and recorded in Scope caveats
+
 ### "A" as in aisle (10-Oct-2026)
 
 - Deployment-context-aware scoring, so reports rate the deployment the operator actually runs instead of the documented default

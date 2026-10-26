@@ -6,9 +6,9 @@ Monocle is an [Agent Skill](https://agentskills.io) for Claude Code and Codex. I
 
 ## Supported Versions
 
-Monocle has no tagged releases yet. Only the current `main` branch receives security updates.
+Monocle publishes named, tagged releases on the [Releases](https://github.com/dan-snelson/Monocle/releases) page. Only the latest release and the current `main` branch receive security updates.
 
-- Current stable: **`main`**
+- Current stable: **`main`** (latest release)
 - Current prerelease line: **`development`**
 - Older copies of the skill receive no security patches.
 

@@ -43,7 +43,7 @@ Extend the fact sheet with one row per candidate issue: every Step 4 hit, and ev
 
 ## Defect classes
 
-Use exactly one class per key, so keys match across runs:
+Use exactly one class per key, so keys match across runs. When two classes fit, use the one listed first:
 
 - `privilege-escalation`
 - `injection`
@@ -92,13 +92,13 @@ The checklist decides only whether the operation *being available* is scored. De
 | C4 | Can a non-admin reach or set the gate (a user-writable config, a policy whose gate the user controls)? | Yes/No + line |
 | C5 | Does it do more than documented (for example, "remove the app suite" also deleting data that sibling products keep in the same vendor folder)? | Yes/No + line |
 | C6 | Does the code defeat the gate (a wrapper that drops `"$@"`, a gate read after the action)? | Yes/No + line |
-| C7 | With the gate blank or unset, does it offer nothing or a safe minimum, or everything? | Safe / Everything + line |
+| C7 | With the gate blank or unset, does it offer nothing or a safe minimum, or everything? Answer for every mode that offers the operation: a gate the code enforces only in its default mode can offer everything in the others | Safe / Everything + line, per mode |
 | C8 | With a non-blank invalid value (typo, wrong case, unknown word), is it rejected, or does it fall through to a high-impact branch? | Rejected / Falls through + line |
 
 | Answers | Disposition |
 |---|---|
 | C1–C3 yes; C4–C6 no; C7 safe; C8 rejected | Not scored (reason code `capability`). Add one Operator baseline bullet per distinct admin gate, marked "(Rule 14 gate; not scored)" |
-| As above, but C7 is "everything" | 🔵 Low secure-default gap (Origin: Code + Deployment). For the alternate, rate the operation with the Decision procedure, Q2–Q5, with this precondition met: "the gate is blank in a policy the documented audience can run" |
+| As above, but C7 is "everything" | 🔵 Low secure-default gap (Origin: Code + Deployment). For the alternate, rate the operation with the Decision procedure, Q2–Q5, with this precondition met: "the gate is blank in a policy the documented audience can run". A standard user reaching a root-only removal (an EDR agent, the app suite) rates as privilege escalation for that operation: 🟠 High (`scoring-example.md`) |
 | As above, but C8 falls through | The same as C7 "everything" when only an admin sets the value. Full severity from Q2–Q5 when a non-admin can influence it |
 | C1, C2, or C3 no; or C4, C5, or C6 yes | Not a capability. Rate it with the Decision procedure, Q1–Q5, on its real exposure |
 
@@ -106,7 +106,7 @@ A confirmation dialog shown to the end user gates only operations limited to tha
 
 ## Non-security inclusion test
 
-Apply the reason codes first: any match makes the issue an `X#`, not scored. Otherwise it is an `N#` and scores 2 points when all three of these hold:
+Apply the reason codes first: any match makes the issue an `X#`, not scored. Otherwise it is an `N#` and scores 2 points when all three of these hold. An issue that fails test 1 or 2 takes `maintainer` (not endpoint code), `inferred-unverified` (not observed), or `unreachable` (no supported trigger); one that fails test 3 takes `immaterial`.
 
 1. It is observed, with a `file:line`, in code that ships to or runs on endpoints.
 2. Its trigger is reachable in a supported configuration: a documented platform, mode, or deploy path.
@@ -127,21 +127,21 @@ Apply the reason codes first: any match makes the issue an `X#`, not scored. Oth
 | `dependency-handled` | A missing dependency stops the run with a logged error and a non-zero exit |
 | `config` | Organization-specific constants an adopter is expected to edit |
 | `malformed-config` | Needs a value the documented format forbids, for example a delimiter inside a field |
-| `unreachable` | Dead code with no current caller |
+| `unreachable` | Dead code with no current caller, or code that no documented deploy path, platform, or mode runs (SKILL.md Step 2 item 11) |
 | `immaterial` | None of the listed consequences, including slow growth bounded by user-started runs |
 | `capability` | An intended capability that passes the Rule 14 checklist |
-| `inferred-unverified` | Depends on unverified third-party behavior along a code path you didn't trace |
+| `inferred-unverified` | Not observed: inferred, or dependent on unverified third-party behavior along a code path you didn't trace |
 | `context` | Its only trigger is in a configuration the operator's Deployment Context puts out of scope. The alternate scores it |
 
 ## Operator baseline and alternate
 
 Build both mechanically from the ledger:
 
-- **One bullet per scored finding whose headline depends on a deployment condition:** `{condition, as the documentation states it} ({doc file:line}) (S# → {severity} if not)`, or `{condition, as the operator states it} (operator-stated) (S# → {severity} if not)` when the Deployment Context sets it. Without context, a condition with no documentation line is an undocumented control, and the headline takes the unsafe rating (`deployment-context.md`, Undocumented controls).
+- **One bullet per scored finding whose headline depends on a deployment condition:** `{condition, as the documentation states it} ({doc file:line}) (S# → {severity} if not)`, or `{condition, as the operator states it} (operator-stated) (S# → {severity} if not)` when the Deployment Context sets it. The `file:line` is the line that states the condition. A nearby heading, warning, or comment is not that line. A platform default listed under Known Apple platform behaviors (`patterns.md`) counts as documented; cite the entry in place of a doc line: `{condition} (patterns.md: {entry title}) (S# → {severity} if not)`. A setting that ships off, and that an administrator must turn on before the finding applies, counts as documented: cite the documentation line that states its default, or, when no line does, the code line that sets it. It takes part in the alternate like any other condition (`security.md`, Q3). When it is also a Rule 14 gate, the gate keeps its own bullet below. Without context, a condition with no documentation line is an undocumented control, and the headline takes the unsafe rating (`deployment-context.md`, Undocumented controls).
 - **Then one bullet per distinct admin gate** from the Rule 14 checklist, marked "(Rule 14 gate; not scored)".
 - **Order:** finding bullets by ID, then gate bullets. If both lists are empty, write "None — the score doesn't depend on deployment."
 - **One alternate only.** Assume every finding bullet's condition fails at once; the Rule 14 gate bullets don't take part. The alternate's condition text is the negation of those finding bullets. Recompute from the same ledger with the alternate severities, score every `context` row, and clamp the result the same way.
-- **Read operator instructions by their evident scope.** An instruction to secure or validate a path covers every directory on that path.
+- **Read a stated condition by its evident scope.** A documentation line or operator statement that secures or validates a path covers every directory on that path.
 - **Host evidence never sets a severity.** The reviewer's Mac can confirm an Apple platform default (SKILL.md Rule 13). It can't establish a deployment state, or what another tool's installer did. Only the operator's Deployment Context can state a deployment state.
 
 ## Freeze check
@@ -149,9 +149,10 @@ Build both mechanically from the ledger:
 Before writing any view, confirm:
 
 - Every Step 4 hit, and every bullet you plan to write, has a ledger row.
-- Every `S#` has a Severity basis. Every Info row passes the Info test in Q2, or reached Info at Q3 (undeployed, or out of the Deployment Context's scope). No Low is folded into the roll-up.
+- Every `S#` has a Severity basis. Every Info row passes the Info test in Q2 (self-scoped and backstopped rows included), or reached Info at Q3 (undeployed, shipped off, or out of the Deployment Context's scope). No Low is folded into the Credits list.
+- Every Likelihood lowering, and every self-scoped and backstopped Info row, names criteria (a)–(c) from `security.md`, Likelihood, in its Severity basis.
 - Every `X#` has exactly one reason code.
 - Every row has a Context effect, and the Deployment Context was applied, asked for once, or not needed (`deployment-context.md`, Eliciting context).
 - The distinct-issue test was applied, and IDs are numbered in the fixed order.
-- The Operator baseline and the single alternate were built as described above.
+- The Operator baseline and the single alternate were built as described above. Every row whose headline Q3 lowered (settings that ship off included), and every self-scoped row with an added effect under a setting that ships off (`security.md`, Q2), has a finding bullet and an alternate severity.
 - The score was computed from the ledger.

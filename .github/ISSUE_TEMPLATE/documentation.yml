@@ -19,10 +19,14 @@ body:
       options:
         - README.md
         - SECURITY.md
+        - CHANGELOG.md or CONTRIBUTING.md
         - monocle/SKILL.md
         - View references (executive.md, security.md, manager.md, engineer.md)
-        - Input and scan references (github-input.md, semgrep.md, specialized-checks.md, large-targets.md)
-        - Monocle Score documentation (SKILL.md Step 5, scoring-example.md)
+        - Input and scan references (github-input.md, semgrep.md, large-targets.md)
+        - Checks and patterns (patterns.md, specialized-checks.md, lang-shell.md, lang-python.md, lang-swift.md, lang-applescript.md)
+        - Monocle Score documentation (SKILL.md Step 5, scoring-procedure.md, scoring-example.md)
+        - Deployment Context (deployment-context.md)
+        - Verify mode and attestation (verify-report.md, attestation.md)
         - Maintenance references (post-chat-refine.md, binge-and-purge.md, prior-reports.md)
         - Install or usage instructions
         - Issue templates

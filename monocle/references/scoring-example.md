@@ -27,11 +27,11 @@ A fully worked Monocle Score calculation for SKILL.md Step 5. It shows the issue
   - X3, README drift (`docs`)
   - X4, a restart deferred to the next login, which the README and the completion dialog state (`documented`)
 - **Headline:** 100 − 61 = **39/100 (🟠 Poor)**. The High range (25–69) doesn't bind.
-- **Alternate:** every Operator baseline condition that flips a finding fails at once: some interactive policy leaves the allowlist blank, `/usr/local/bin` is user-owned, and the wrapper is deployed. Then S3 is High, S4 Medium, and S8 Medium: 100 − (73 + 18) = 9, **floored at 25 → 25/100 (🟠 Poor)**.
+- **Alternate:** every Operator baseline condition that flips a finding fails at once: some interactive policy leaves the allowlist blank, `/usr/local/bin` is user-owned, and the wrapper is deployed. Then S3 is High (Q5: a standard user runs a root-only removal, rated as privilege escalation for that operation), S4 High (Q4: root runs a binary a standard user can replace; no race), and S8 Medium (Q5: root writes a fixed shared path and runs it; a pre-planted file still needs a rewrite between root's write and run, so High's no-race test fails and Medium's race criterion matches): 100 − (85 + 18) leaves 0, **floored at 25 → 25/100 (🟠 Poor)**.
 - **Operator baseline:**
-  - Every interactive policy sets an allowlist that excludes EDR removal (S3 → High if not).
-  - `/usr/local/bin` is root-owned on every Mac in scope (S4 → Medium if not).
-  - Every policy runs the main script, not the wrapper (S8 → Medium if not).
+  - Every interactive policy sets an allowlist that excludes EDR removal (README.md:{n}) (S3 → High if not).
+  - `/usr/local/bin` is root-owned on every Mac in scope (patterns.md: Intel `/usr/local/bin` can be user-owned) (S4 → High if not).
+  - Every policy runs the main script, not the wrapper (README.md:{n}) (S8 → Medium if not).
 
 ---
 
@@ -39,9 +39,9 @@ A fully worked Monocle Score calculation for SKILL.md Step 5. It shows the issue
 
 | Finding | Documented baseline | With the operator's context | Alternate |
 |---|---|---|---|
-| The staging folder takes the default umask, so other local accounts can read bundles (Code + Deployment) | 🟡 Medium | 🔵 Low: Q3, the path runs but no other local account exists (mitigated) | 🟡 Medium |
-| The shared-staging config file chooses the upload destination (Code + Deployment) | 🔵 Low: Q3, the documentation limits writes to the team | ⚪ Info: Q3, shared staging is out of scope (mitigated) | 🟡 Medium |
-| Bundle redaction misses quoted-JSON secrets (Code) | 🔵 Low | 🔵 Low (independent) | 🔵 Low |
+| S1: the staging folder takes the default umask, so other local accounts can read bundles (Code + Deployment) | 🟡 Medium | 🔵 Low: Q3, the path runs but no other local account exists (mitigated) | 🟡 Medium |
+| S3: the shared-staging config file chooses the upload destination (Code + Deployment) | 🔵 Low: Q3, the documentation limits writes to the team | ⚪ Info: Q3, shared staging is out of scope (mitigated) | 🟡 Medium |
+| S2: bundle redaction misses quoted-JSON secrets (Code) | 🔵 Low | 🔵 Low (independent) | 🔵 Low |
 | N7 | 2 | Not scored, `context` | 2 |
 | N1–N6 | 12 | 12 | 12 |
 | **Score** | 100 − 28 = **72/100 (🔵 Good)**; Overall risk 🟡 Medium | 100 − 18 = **82/100 (🔵 Good)**; Overall risk 🔵 Low | 100 − 33 = **67/100 (🟡 Fair)** |
@@ -49,7 +49,7 @@ A fully worked Monocle Score calculation for SKILL.md Step 5. It shows the issue
 - **Headline:** 82/100 (🔵 Good), at the operator-stated deployment context. The Low range (70–100) doesn't bind.
 - **Alternate:** every Operator baseline condition fails at once (another local account exists, and shared staging is writable beyond the team): 67/100 (🟡 Fair), inside the Medium range (50–89). The documented baseline (72) isn't shown as a third score; the Deployment context lines say what the context changed.
 - **Operator baseline:**
-  - No other local accounts on the Mac (operator-stated) (umask finding → Medium if not).
-  - Staging stays local; shared staging is out of scope (operator-stated) (config finding → Medium, N7 scored, if not).
+  - No other local accounts on the Mac (operator-stated) (S1 → Medium if not).
+  - Staging stays local; shared staging is out of scope (operator-stated) (S3 → Medium, N7 scored, if not).
 - **The redaction gap is independent of deployment model.** No context item negates its precondition, so it keeps its rating in all three columns.
-- **Context can also raise.** Had the operator said the tool ships in the enrollment prestage to every Mac, Adjustment 1 would raise each finding one level, and the headline would fall below the documented baseline.
+- **Context can also raise.** Had the operator also said the tool ships in the enrollment prestage to every Mac, Adjustment 1 would raise the one finding Q3 didn't set, the redaction gap (S2), to 🟡 Medium: 100 − 23 = **77/100 (🔵 Good)**. The Q3 ratings don't move.
