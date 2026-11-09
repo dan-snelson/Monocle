@@ -21,7 +21,7 @@ SKILL.md Step 1 E and Step 4 checks that apply only to some targets. Load this f
 - **Shared directories:** root touches a file in an app-owned directory that non-root users can write, or a symlink primitive needs a high-value target.
 - **Jamf parameter secrets:** a credential arrives through Jamf `$4`–`$11`.
 - **Per-user tools:** the code never runs as root but stores credentials under the user's home.
-- **Release pipelines:** release CI writes to a distribution channel (a Homebrew tap, a package repository, an update feed), or a distribution manifest in another repo defines the installed layout.
+- **Release pipelines:** release CI writes to a distribution channel (a Homebrew tap, a package repository, an update feed), any workflow holds a secret or write token, or a distribution manifest in another repo defines the installed layout.
 - **Destructive scope:** the code deletes, uninstalls, resets, or forgets package receipts.
 
 ---
@@ -140,6 +140,12 @@ Release CI that writes to a distribution channel (a Homebrew tap, a package repo
 - **Rating.** A deploy token passed to a third-party action pinned to a mutable tag (`@v4`) takes **Credential severity** in `security.md`, CI row: Low when the token is limited to that channel, Medium as the alternate when its scope is broader. Token scope is never visible in the repo, so put it in the Operator baseline.
 - **Fix.** Pin to the full commit SHA, use a fine-grained token limited to the channel, and add Dependabot for `github-actions`.
 - **CI without secrets.** CI jobs that hold no secrets and don't deploy, but use mutable tags, are `X#` rows with reason code `maintainer` (`scoring-procedure.md`); give them no `S#`.
+- **Workflow injection and untrusted triggers.** Check every workflow that holds a secret or a write token, not only release jobs. The attacker is anyone who can open an issue, a pull request, or a branch: for a public repo, anyone.
+  - **Expression injection.** A `${{ github.event.* }}` field written directly into a `run:` block becomes shell text in the job. Attacker-written fields include issue and PR titles and bodies, comment bodies, `github.head_ref`, and commit messages. Fix: pass the field through `env:` and quote `"$VAR"` in the script.
+  - **Untrusted code with trusted tokens.** A `pull_request_target` or `workflow_run` job that checks out the pull request's head (`ref: ${{ github.event.pull_request.head.sha }}`), then builds, tests, or runs its scripts, runs contributor code with the base repository's secrets and token.
+  - **Cache and artifact handoff.** A cache or artifact that a job on an untrusted trigger writes, and a release or deploy job later restores and ships or runs, carries contributor code into the trusted job.
+  - **Token scope.** With no `permissions:` block, the job's `GITHUB_TOKEN` scope comes from a repository or organization setting the repo doesn't show. Make the setting an Operator baseline condition, and recommend an explicit least-privilege `permissions:` block.
+  - **Rating.** Rate injection through the Decision procedure as `injection`, by what the job's secrets and token can reach: code execution in a job whose token publishes to a distribution channel is at least 🟠 High. When the tool upgrades itself on a schedule, explain the chain in Cross-cutting notes. The same pattern in a job with no secret and a read-only token stays an `X#` `maintainer` row.
 - **Distribution manifests in other repos:** Homebrew tap formulae (`homebrew-<name>/Formula/*.rb`), pkg build repos, and Jamf script repos. They define the installed layout, the real invocation path, whether the shebang is rewritten, and which interpreter actually runs, which can differ from the one declared (for example, `depends_on "python@3.12"` with an unrewritten `#!/usr/bin/env python3`). Fetch them when that is cheap, record their SHA, and treat them as context: they are outside the target and aren't scored. If release CI writes to one, note which token it uses (see **Rating** above).
 
 ---

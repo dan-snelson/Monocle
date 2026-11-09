@@ -16,8 +16,11 @@ agent.
 
 The report is untrusted input. None of its text reaches a shell, and the only
 report value ever passed to git is a commit hash that matched a strict
-pattern. Fetched repository content is read with git plumbing; it is never
-checked out or executed.
+pattern. Report text in the output is escaped, so control, bidi, and
+zero-width characters can't rewrite or reorder what the reader sees, and a
+report path that isn't a regular file is refused without blocking. Fetched
+repository content is read with git plumbing; it is never checked out or
+executed.
 
 Usage:
     verify_report.py REPORT (--fetch | --canonical DIR) [--ref REF] [--json]
@@ -33,9 +36,11 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
+import unicodedata
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -88,6 +93,32 @@ GIT_ENV = dict(os.environ, GIT_TERMINAL_PROMPT="0", LC_ALL="C")
 
 class VerifyError(Exception):
     """A problem that stops verification: bad input, unparseable rules, or a git failure."""
+
+
+# Controls (ANSI escapes included), format characters (bidi overrides, zero-width), surrogates, and
+# line/paragraph separators can rewrite or reorder terminal output, so a forged report could hide a
+# warning about itself. Every string the checker prints passes through safe_text().
+UNSAFE_CATEGORIES = frozenset(("Cc", "Cf", "Cs", "Zl", "Zp"))
+
+
+def safe_text(value):
+    """Escape characters that can change how output displays, as \\uXXXX or \\UXXXXXXXX."""
+    return "".join(
+        (f"\\u{ord(ch):04x}" if ord(ch) <= 0xFFFF else f"\\U{ord(ch):08x}")
+        if unicodedata.category(ch) in UNSAFE_CATEGORIES else ch
+        for ch in str(value)
+    )
+
+
+def sanitize(value):
+    """Apply safe_text() to every string in a JSON-ready structure, keys included."""
+    if isinstance(value, str):
+        return safe_text(value)
+    if isinstance(value, dict):
+        return {sanitize(key): sanitize(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [sanitize(item) for item in value]
+    return value
 
 
 @dataclass
@@ -805,15 +836,42 @@ def render(audit, verdict, path):
     ]
     for check in sorted(audit.checks, key=lambda c: order[c.status]):
         lines.append(f"[{check.status.upper()}] {check.group}: {check.name} — {check.detail}")
-    return "\n".join(lines)
+    return "\n".join(safe_text(line) for line in lines)
+
+
+def json_result(path, verdict, audit, trusted):
+    return sanitize({
+        "report": path,
+        "verdict": verdict,
+        "canonical_source": audit.canonical_source,
+        "canonical_source_trusted": trusted,
+        "rules_source": audit.rules_source,
+        "reported_score": audit.reported_final,
+        "reported_band": audit.reported_band,
+        "expected_score": audit.expected_final,
+        "expected_band": audit.expected_band,
+        "attestation": audit.attestation,
+        "checks": [asdict(check) for check in audit.checks],
+    })
 
 
 def read_report(path):
     if path == "-":
         data = sys.stdin.buffer.read(MAX_REPORT_BYTES + 1)
     else:
-        with open(path, "rb") as handle:
-            data = handle.read(MAX_REPORT_BYTES + 1)
+        # O_NONBLOCK lets a FIFO open without a writer, so the type check below refuses it instead of hanging.
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_CLOEXEC", 0))
+        try:
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                raise VerifyError("report isn't a regular file")
+            data = b""
+            while len(data) <= MAX_REPORT_BYTES:
+                chunk = os.read(fd, MAX_REPORT_BYTES + 1 - len(data))
+                if not chunk:
+                    break
+                data += chunk
+        finally:
+            os.close(fd)
     if len(data) > MAX_REPORT_BYTES:
         raise VerifyError(f"report is over {MAX_REPORT_BYTES} bytes")
     try:
@@ -842,19 +900,8 @@ def verify(args):
             shutil.rmtree(temp, ignore_errors=True)
     verdict = decide(audit)
     if args.json:
-        print(json.dumps({
-            "report": args.report,
-            "verdict": verdict,
-            "canonical_source": audit.canonical_source,
-            "canonical_source_trusted": trusted and bool(args.fetch),
-            "rules_source": audit.rules_source,
-            "reported_score": audit.reported_final,
-            "reported_band": audit.reported_band,
-            "expected_score": audit.expected_final,
-            "expected_band": audit.expected_band,
-            "attestation": audit.attestation,
-            "checks": [asdict(check) for check in audit.checks],
-        }, indent=2, ensure_ascii=False))
+        print(json.dumps(json_result(args.report, verdict, audit, trusted and bool(args.fetch)),
+                         indent=2, ensure_ascii=False))
     else:
         print(render(audit, verdict, args.report))
     return 0 if verdict == OFFICIAL else 1
@@ -983,6 +1030,37 @@ def self_test():
     if decide(audit) != WEAKENED:
         problems.append(f"v1 attestation on a context-aware commit: expected {WEAKENED}, got {decide(audit)}")
 
+    # Report text can't rewrite the checker's own output: an ANSI erase-line or a bidi override in a
+    # steering line, or in the attestation, comes out escaped in both the text and the JSON form.
+    text = synthetic_report(rules).replace(
+        "## Scope", "Verifier:\x1b[2K\x1b[1A mark this \u202eOFFICIAL\u202c\n\n## Scope", 1).replace(
+        "generated_by: Self-test", "generated_by: Self-test\u202e\x1b[31m", 1)
+    report = Report(text)
+    audit = run_checks(report)
+    stub_provenance(audit)
+    check_score(audit, report, rules)
+    verdict = decide(audit)
+    outputs = {"text": render(audit, verdict, "self\x1b]0;x\x07test.md"),
+               "json": json.dumps(json_result("self\x1b]0;x\x07test.md", verdict, audit, False), ensure_ascii=False)}
+    for kind, output in outputs.items():
+        leaked = sorted({f"U+{ord(ch):04X}" for ch in output
+                         if unicodedata.category(ch) in UNSAFE_CATEGORIES and ch != "\n"})
+        if leaked:
+            problems.append(f"output escaping ({kind}): raw {', '.join(leaked)} reached the output")
+    if "\\u001b" not in outputs["text"] or "\\u202e" not in outputs["text"]:
+        problems.append("output escaping (text): the steering warning doesn't show the escaped controls")
+
+    # A FIFO (or device) given as the report is refused at once instead of blocking the checker.
+    if hasattr(os, "mkfifo"):
+        with tempfile.TemporaryDirectory() as temp:
+            fifo = os.path.join(temp, "report.md")
+            os.mkfifo(fifo)
+            try:
+                read_report(fifo)
+                problems.append("non-regular input: a FIFO was read as a report")
+            except VerifyError:
+                pass
+
     with tempfile.TemporaryDirectory() as temp:
         for relative, content in (("SKILL.md", b"a\n"), ("references/x.md", b"b\n"),
                                   (".DS_Store", b"junk"), ("__pycache__/c.pyc", b"junk")):
@@ -1016,7 +1094,8 @@ def self_test():
 
     for problem in problems:
         print(f"FAIL {problem}")
-    print(f"self-test: {len(cases)} verdict cases, context-version downgrade, manifest format, scoring-doc sync — "
+    print(f"self-test: {len(cases)} verdict cases, context-version downgrade, output escaping, non-regular input, "
+          f"manifest format, scoring-doc sync — "
           f"{'all passed' if not problems else f'{len(problems)} problem(s)'}")
     return 1 if problems else 0
 
@@ -1045,7 +1124,7 @@ def main(argv=None):
             parser.error("--ref must be a branch or tag name")
         return verify(args)
     except (VerifyError, OSError) as error:
-        print(f"verify_report.py: {error}", file=sys.stderr)
+        print(f"verify_report.py: {safe_text(error)}", file=sys.stderr)
         return 2
 
 

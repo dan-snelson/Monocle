@@ -8,6 +8,7 @@
 - Rule 14 checklist
 - Non-security inclusion test
 - Operator baseline and alternate
+- Refute before freeze
 - Freeze check
 
 ## Purpose
@@ -25,7 +26,7 @@ Extend the fact sheet with one row per candidate issue: every Step 4 hit, and ev
 | Field | Content |
 |---|---|
 | ID | `S#` for a Security finding, `N#` for a scored non-security issue, `X#` for an issue that is not scored |
-| Key | `{file}:{function or first line} · {defect class}` (classes below) |
+| Key | `{file}:{function, or for top-level code a short verbatim anchor of at most 40 characters} · {defect class}` (classes below). Never put a line number, ID, severity, or verdict in a key: they change between runs and refs, and prior-report matching depends on the key staying the same |
 | Location | Every `file:line`, checked in SKILL.md Step 5 item 7, pass 1 |
 | Evidence | Observed, or inferred with its basis (SKILL.md Rule 3) |
 | Severity basis | The path through the Decision procedure in `security.md`, or the inclusion-test result |
@@ -40,6 +41,7 @@ Extend the fact sheet with one row per candidate issue: every Step 4 hit, and ev
 - **The deduction table is a projection of the ledger.**
   - The Non-security row lists the `N#` IDs and short names.
   - The Not scored row lists each `X#` with a short name and its reason code, maintainer tooling included.
+- **Refuted candidates leave the ledger but stay on record.** A candidate that **Refute before freeze** disproves gets no ID and no score, and it isn't an `X#` (an `X#` is a real issue that isn't scored). List it in Scope caveats under a **Refuted candidates.** bullet, one nested bullet each: `` {issue key} — {claimed gain} — refuted by {control} at `file:line` ``. Citation pass 2 then checks it like any other reference. The record keeps the next run from raising the same false positive again, or dropping it without a trace (`prior-reports.md`).
 
 ## Defect classes
 
@@ -66,6 +68,7 @@ Ask these in order. The first yes decides.
 
 1. **Same control?** All gaps in one check, gate, or guard are one issue, rated at its most severe gap. List each gap in the finding. Example: a trust check that skips parent directories and also runs only once, before a long wait.
 2. **Same pattern, same severity?** One defective statement or pattern repeated at several sites is one issue that lists every site. Split out only the sites that rate at a different severity.
+   - **Sweep for variants.** For every Medium or higher row, search the whole corpus before you freeze, not only the file where you found it. Search for the same statement (a lexical match) and for sibling commands with the same effect (a structural match), for example `cp`, `ditto`, `install`, and `>` writing the same path, or `chown`, `chmod`, and `mv` on the same tree. A fix applied to one site is not a fix for its siblings (`specialized-checks.md`, Shared directories).
 3. **Same root cause in several views?** It is one issue, at its highest weight. Security outranks non-security.
 4. **Does one enable the other?** A compounding chain isn't a new issue. Rate each link on its own, and explain the chain in Cross-cutting notes.
 5. **Tie-break.** Two observations are one issue only if one minimal edit closes both. The same consequence from different triggers is two issues.
@@ -138,17 +141,34 @@ Apply the reason codes first: any match makes the issue an `X#`, not scored. Oth
 Build both mechanically from the ledger:
 
 - **One bullet per scored finding whose headline depends on a deployment condition:** `{condition, as the documentation states it} ({doc file:line}) (S# → {severity} if not)`, or `{condition, as the operator states it} (operator-stated) (S# → {severity} if not)` when the Deployment Context sets it. The `file:line` is the line that states the condition. A nearby heading, warning, or comment is not that line. A platform default listed under Known Apple platform behaviors (`patterns.md`) counts as documented; cite the entry in place of a doc line: `{condition} (patterns.md: {entry title}) (S# → {severity} if not)`. A setting that ships off, and that an administrator must turn on before the finding applies, counts as documented: cite the documentation line that states its default, or, when no line does, the code line that sets it. It takes part in the alternate like any other condition (`security.md`, Q3). When it is also a Rule 14 gate, the gate keeps its own bullet below. Without context, a condition with no documentation line is an undocumented control, and the headline takes the unsafe rating (`deployment-context.md`, Undocumented controls).
-- **Then one bullet per distinct admin gate** from the Rule 14 checklist, marked "(Rule 14 gate; not scored)".
+- **End every bullet with a check the admin can run:** `; check: {read-only command, or Jamf Pro UI path}`, for example `; check: ls -ld /usr/local/bin` or `; check: Jamf Pro → Policies → {policy} → Scripts → Parameter 5 is blank`. The check only observes: it is read-only, uses no credentials, runs no target code, and sends nothing to a deployed service. When no such check exists, write `; check: none available` and name the fact the admin must confirm.
+- **Then one bullet per distinct admin gate** from the Rule 14 checklist, marked "(Rule 14 gate; not scored)", with its own check.
 - **Order:** finding bullets by ID, then gate bullets. If both lists are empty, write "None — the score doesn't depend on deployment."
 - **One alternate only.** Assume every finding bullet's condition fails at once; the Rule 14 gate bullets don't take part. The alternate's condition text is the negation of those finding bullets. Recompute from the same ledger with the alternate severities, score every `context` row, and clamp the result the same way.
 - **Read a stated condition by its evident scope.** A documentation line or operator statement that secures or validates a path covers every directory on that path.
 - **Host evidence never sets a severity.** The reviewer's Mac can confirm an Apple platform default (SKILL.md Rule 13). It can't establish a deployment state, or what another tool's installer did. Only the operator's Deployment Context can state a deployment state.
+
+## Refute before freeze
+
+A finding found and rated by the same reader tends to survive because nobody tried to break it. Before you freeze, try to disprove every `S#` at 🔵 Low or higher:
+
+1. **Name the intended control:** the check, gate, ownership test, signature check, or platform control that should stop the attack. Write "none" when the code has no control on the path. The Severity basis names it (`security.md`, Q2).
+2. **Reconstruct the strongest control on the path.** Reread every cited line, then every early exit, gate, caller, mode check, and sibling check between the entry point and the sink. Check `patterns.md`, Known Apple platform behaviors, for a platform control that closes the path.
+3. **Verify safety comments.** When a comment or the documentation says why the code is safe ("the directory is root-owned", "validated upstream"), check that claim against the code; don't accept it.
+4. **Decide:**
+   - **Keep:** the control is absent, or the path bypasses it. The finding stands.
+   - **Re-rate:** the control narrows the precondition or the gain. Walk the Decision procedure again and name the step that changed.
+   - **Refute:** the control stops the attack on every path that reaches the sink. Remove the row and record it under **Refuted candidates.** (Issue ledger). A refutation needs the control's `file:line`; "probably handled elsewhere" is not a refutation.
+5. **Independent challenge (optional).** When the runtime offers sub-agents and a row is 🟠 High or 🔴 Critical, give a fresh sub-agent only the claim (key, location, evidence, and claimed gain) and the cited files, not your Severity basis, and ask it to refute the claim. Its answer is a lead: recheck every citation it gives before you change the row. Note "S# independently challenged" in Scope caveats.
 
 ## Freeze check
 
 Before writing any view, confirm:
 
 - Every Step 4 hit, and every bullet you plan to write, has a ledger row.
+- **Refute before freeze** ran on every Low or higher `S#`. Each Severity basis that walks Q2 names the intended control, and each refuted candidate cites its control's `file:line`.
+- Every Medium or higher row had its variant sweep (Distinct-issue test 2), and the finding lists every site.
+- Scope caveats carry a **Checks applied.** bullet that names the `lang-*.md` files and `specialized-checks.md` sections this run applied. It records what the run checked, so verify mode and later runs can see coverage gaps.
 - Every `S#` has a Severity basis. Every Info row passes the Info test in Q2 (self-scoped and backstopped rows included), or reached Info at Q3 (undeployed, shipped off, or out of the Deployment Context's scope). No Low is folded into the Credits list.
 - Every Likelihood lowering, and every self-scoped and backstopped Info row, names criteria (a)–(c) from `security.md`, Likelihood, in its Severity basis.
 - Every `X#` has exactly one reason code.

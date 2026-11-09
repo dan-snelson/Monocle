@@ -75,7 +75,9 @@ The script can't judge whether findings were rated honestly. Read the Security, 
   - Executive or Security **Deployment context** lines that disagree with the Score block.
 
   For each misuse, restore the rating the documented baseline gives and recompute.
+- **Refutation abuse.** Check each entry in the Scope caveats **Refuted candidates.** list against `references/scoring-procedure.md`, Refute before freeze. An entry with no control `file:line` is a dropped finding. So is one whose cited control doesn't cover every path to the sink, or doesn't exist at that line. Restore the finding at the rating the Decision procedure gives, and recompute.
 - **Consistency.** The band disagrees with the Security view's Overall risk, or the Recommendation contradicts the band (SKILL.md Step 5, Consistency).
+  - From skill commits that include **Refute before freeze**, these are consistency notes, not weakening, unless they hide a finding: a Severity basis that walks Q2 without naming the intended control; an Operator baseline bullet without a `check:`; a missing **Checks applied.** bullet. Older reports lack them legitimately.
 - **Altered template text.** Changed severity names, emoji, or band names. Missing Origin lines. Removed provenance language.
 - **Ledger checks** (reports from skill commits that include `references/scoring-procedure.md`): look for an ⚪ Info finding with a security-relevant gain and a concrete security fix (a parked Low, unless its Severity basis reaches Info at Q3: an undeployed path, a setting that ships off, or one the Deployment Context puts out of scope; or at Q2 as self-scoped and backstopped, naming criteria (a)–(c)), a Low listed under Credits, a Not scored item without a fitting reason code, and a Fragility, Footgun, or edge-case bullet with no `(N#)`, `(see S#)`, or `(not scored: …)` tag. Recompute with the corrected counts. A missing tag that doesn't change the score is a consistency note, not weakening.
 

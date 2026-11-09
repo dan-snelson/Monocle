@@ -4,6 +4,21 @@
 
 ## Version History
 
+### Unreleased
+
+- Scoring credibility
+    - New **Refute before freeze** step (`scoring-procedure.md`). Every Low or higher finding names its intended control, and Monocle tries to disprove it before the score is frozen. It rereads early exits, gates, callers, sibling checks, and platform controls, and checks safety comments instead of accepting them. High and Critical rows can be challenged by a fresh sub-agent that doesn't see the Severity basis
+    - Refuted candidates get no ID and no score. Scope caveats list them, each with the control's `file:line`. Prior reports give each one a disposition, **Still refuted** or **Reopened**, so a re-run neither raises the same false positive again nor drops it silently. Verify mode treats a refutation with no control, or one that doesn't cover the path, as a dropped finding
+    - Q2 in the Decision procedure names the intended control ("control: none" when the path has none)
+    - Issue keys never carry a line number, ID, severity, or verdict; top-level code uses a short verbatim anchor. Older keys with line numbers match by file, function or anchor, and defect class
+    - Variant sweep: every Medium or higher row is searched across the whole corpus for the same statement and for sibling commands with the same effect before the freeze
+    - Scope caveats carry a **Checks applied.** bullet naming the `lang-*.md` files and `specialized-checks.md` sections a run applied
+- Operator baseline bullets end with a read-only `check:` (a command or a Jamf Pro UI path) so admins can confirm each assumption. Inferred findings get a **To confirm:** line
+- `lang-swift.md` adds privileged-helper and local-IPC checks: client identity by audit token, not PID; requirement strength (`anchor apple generic` alone matches every Developer ID); injectable trusted clients; confused-deputy helper methods; verify-then-use file swaps; per-operation authorization rights; URL-scheme handlers; and local listeners without peer authentication
+- Release pipelines adds GitHub Actions expression injection, `pull_request_target` and `workflow_run` jobs that run pull-request code with trusted tokens, cache and artifact handoffs into release jobs, and token scope without a `permissions:` block. It triggers for any workflow that holds a secret or write token
+- Rule 4 isolated checks run in the scratch directory under `env -i`, and record only the command and result, with the host account and home path redacted
+- `verify_report.py` escapes control, bidi, and zero-width characters in everything it prints, text and `--json`, so a forged report can't rewrite or hide the checker's warnings. It refuses a report path that isn't a regular file (a FIFO, device, or directory) without blocking. `--self-test` covers both
+
 ### "B" as in bdellium (23-Oct-2026)
 
 - Scoring
