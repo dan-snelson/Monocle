@@ -9,6 +9,7 @@ Language checks for AppleScript and `osascript` targets, for SKILL.md Step 4. Lo
 ### Security checks
 
 - **`do shell script "…" & userInput`** without `quoted form of` leads to shell injection.
+- **Shell values interpolated into script source:** `osascript -e "… ${var} …"`, or an unquoted heredoc (`<<EOF`, including `-l JavaScript`), turns the value into AppleScript or JXA code, so a quote in it breaks out. Trace every caller: refute the candidate when all of them pass constants, and otherwise rate it as injection by who controls the value. Fix by passing values as arguments (`on run argv`, or JXA `function run(argv)`) with a quoted heredoc (`<<'EOF'`).
 - **`with administrator privileges`** prompts for credentials or runs as root. Rate a `password "…"` literal with **Credential severity** in `security.md` (hardcoded row).
 - **`display dialog … default answer`** used to collect passwords invites credential phishing. Note whether `with hidden answer` is set and where the value goes.
 - **`System Events` / UI scripting** requires an Accessibility (TCC) grant. Check whether a PPPC profile grants it broadly.

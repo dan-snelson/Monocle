@@ -135,6 +135,7 @@ Extends SKILL.md Rule 13.
 - **In-place overwrite keeps inode, size, and mtime.** Writing over a file without truncating (`1<>` in the shell, `O_WRONLY` without `O_TRUNC`) keeps its inode and size, and `touch -t`/`touch -r` restores mtime; only ctime changes (Darwin 25). An approval cache keyed on path, size, mtime, and inode misses the change; add ctime.
 - **Hard links cross ownership.** A standard user can hard-link a root-owned file on the same APFS volume; `/Users`, `/Library`, `/private/etc`, and `/private/tmp` share the Data volume (Darwin 25).
 - **Sticky shared directories.** `/tmp`, `/var/tmp` (`1777`), and `/Users/Shared` stop users from deleting other users' files, not from creating a name first or replacing their own files.
+- **`rm -rf` doesn't follow symlinks.** `/bin/rm -rf` on a symlink operand that points to a directory removed only the link, and on a directory containing a symlink to another directory it removed the link without touching the target (Darwin 27). A root `rm -rf` of a fixed name in a shared directory is therefore not a symlink-follow primitive by itself; what remains is deleting whatever a user put at that name. The check didn't cover a directory swapped mid-traversal.
 - **Minimal `PATH`.** launchd jobs and Jamf policies start with a minimal `PATH`.
 - **Bundled tools.** `python3` is no longer bundled; `/usr/bin/jq` ships only on macOS 15+.
 - **APFS is case-insensitive by default.** `Id` resolves to `/usr/bin/id`.

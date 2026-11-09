@@ -21,6 +21,7 @@ How to use an earlier Monocle report on the same target, for SKILL.md Step 5. Lo
 
   Never re-raise a still-refuted candidate as a finding, and never drop one from the list without a disposition.
 - **Same ref and same skill commit, different score:** the **Score change** line lists every Re-rated and Rejected disposition, and every new issue, as a counting correction.
+- **Same ref, different skill commit:** a rerun after a skill update isn't a duplicate. Record the dispositions in a Scope caveats **Rerun of the same ref** bullet that names both skill commits. When new rows shift the fixed-order numbering, map each prior ID to its new one (prior `X2` → `X5`), so readers can follow an item across reports. Label new rows "previously missed", since the code didn't change. When the score moves, the Score change line calls it a counting correction.
 - If the target ref/SHA or working tree status differs, treat the prior report as historical context only. Rebuild the fact sheet from the current target.
 - If the new report would differ only by timestamp, tell the user that the previous report already covers the same clean ref and give its path instead of creating a duplicate, unless they explicitly asked for a fresh timestamped rerun. If they did ask for a rerun, state in the Scope section that it is a rerun of the same ref and summarize what was revalidated.
 - Never copy a previous report into a new file without a fresh citation pass. A copied report with only the Date changed is stale evidence.
