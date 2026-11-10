@@ -4,7 +4,7 @@
 
 ## Version History
 
-### Unreleased
+### "C" as in czar (10-Nov-2026)
 
 - Scoring credibility
     - New **Refute before freeze** step (`scoring-procedure.md`). Every Low or higher finding names its intended control, and Monocle tries to disprove it before the score is frozen. It rereads early exits, gates, callers, sibling checks, and platform controls, and checks safety comments instead of accepting them. High and Critical rows can be challenged by a fresh sub-agent that doesn't see the Severity basis
