@@ -461,7 +461,7 @@ Use this layout for the full report. Keep all headings, even when a section is s
 | **Scope caveats** | {"None", or "See below"} |
 
 **Scope caveats:**
-- **{Short label}.** {One caveat per bullet: skipped files, coverage, checks applied, refuted candidates, unfetchable deps, assumptions, isolated checks, side effects. Nest bullets for line ranges and lists.}
+- **{Short label}.** {One caveat per bullet: skipped files, coverage, checks applied, issue keys, refuted candidates, challenges, unfetchable deps, assumptions, isolated checks, side effects. Nest bullets for line ranges and lists.}
 
 **Attestation:** {block per references/attestation.md}
 

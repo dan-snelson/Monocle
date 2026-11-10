@@ -1,0 +1,25 @@
+{
+  "description": "The same app removal, but a blank Parameter 4 removes all three apps. Tests the Rule 14 secure-default gap: a Low headline with a High alternate.",
+  "deployment_context": null,
+  "prompt_suffix": "",
+  "expect": {
+    "score_range": [70, 100],
+    "bands": ["Excellent", "Good"],
+    "alternate_score_range": [25, 69],
+    "overall_risk": "Low",
+    "no_other_findings": false,
+    "findings": [
+      {
+        "class": "gate",
+        "file": "remove-apps.zsh",
+        "severity": "Low",
+        "alternate": "High",
+        "rationale": "Rule 14 checklist as in the gated-removal fixture, except C7 is 'everything': '${4:-Zoom,Slack,Teams}' makes a blank gate remove all three apps. The Rule 14 table gives a Low secure-default gap (Origin: Code + Deployment). Alternate: with the gate blank in a Self Service policy (the documented audience), a standard user removes root-only app bundles, which rates as privilege escalation for that operation, High (scoring-procedure.md, Rule 14 checklist dispositions)."
+      }
+    ],
+    "not_scored": [],
+    "refuted": [],
+    "must_not_flag": []
+  },
+  "rationale": "Headline: one Low gives 97 before non-security rows, in the 70-100 range. Alternate: the same row at High gives 80, capped at 69."
+}

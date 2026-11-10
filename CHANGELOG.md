@@ -18,6 +18,23 @@
 - Release pipelines adds GitHub Actions expression injection, `pull_request_target` and `workflow_run` jobs that run pull-request code with trusted tokens, cache and artifact handoffs into release jobs, and token scope without a `permissions:` block. It triggers for any workflow that holds a secret or write token
 - Rule 4 isolated checks run in the scratch directory under `env -i`, and record only the command and result, with the host account and home path redacted
 - `verify_report.py` escapes control, bidi, and zero-width characters in everything it prints, text and `--json`, so a forged report can't rewrite or hide the checker's warnings. It refuses a report path that isn't a regular file (a FIFO, device, or directory) without blocking. `--self-test` covers both
+- Persisted issue keys
+    - Scope caveats carry an **Issue keys.** bullet with every `S#`, `N#`, and `X#` key, so a later run can match items across reports; until now keys lived only in the in-session ledger, and only refuted candidates were written down
+    - `prior-reports.md` reads keys from that bullet, and falls back to file, function or anchor, and defect class for older reports
+    - `verify_report.py` warns, without changing the verdict, when a deduction-table ID has no key, a key names an ID the table doesn't list, or a key has no known defect class or carries a line number. `--json` includes the parsed keys, and `--self-test` checks the defect-class list against `scoring-procedure.md`
+- Fresh-context rules
+    - The independent challenge in **Refute before freeze** uses a fixed prompt that carries Rule 5, because the sub-agent reads hostile target files without the rest of the skill. A challenge in the same context isn't independent, and a sub-agent that fails is recorded as `not run`, never as a challenge the row survived. Every High and Critical row gets an **Independent challenge.** status in Scope caveats
+    - New **Executive fresh-reader check** (`executive.md`): a fresh sub-agent that sees only the Executive view restates the recommendation, the main risk and its origin, and the next action. A mismatch changes the Executive wording, never the ledger or the score
+    - Verify mode treats a challenger's `refuted` without a rechecked control as a dropped finding, and a `not run` challenge as a disclosed gap
+- Guardrails for a skill that edits itself
+    - New `.github/scripts/check_skill_structure.py`, run in CI: the 59,000-byte SKILL.md budget, the Agent Skills frontmatter limits, reference pointers and the README Layout tree, the reference house format (Contents lists `##` sections), safety sentinels that must survive word for word, and relative links and anchors
+    - New `.github/dependabot.yml` keeps the SHA-pinned actions current, with a seven-day cooldown
+    - New `AGENTS.md` (and `CLAUDE.md`, which imports it) for agents that help maintain the repo
+- Calibration fixtures
+    - New `tests/fixtures/`: seven small synthetic targets, each with the ledger a correct run should produce and a rationale that walks the Decision procedure
+    - New `tests/grade_report.py` grades a report against a fixture (PASS, DRIFT, or FAIL) and compares the ledgers of two runs on one target. Its `--self-test` validates every fixture and runs in CI
+    - New `tests/run_live.py` (opt-in, uses model quota) runs Monocle headless on the fixtures in fresh workspaces that hold only the target, then grades and compares the reports
+    - New `TESTING.md` with the offline checks, the live runs, and a run record
 
 ### "B" as in bdellium (23-Oct-2026)
 

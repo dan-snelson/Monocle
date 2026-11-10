@@ -10,6 +10,7 @@
   - Good
   - Good (low-risk case)
 - Language notes
+- Fresh-reader check
 
 ## Purpose
 
@@ -166,3 +167,24 @@ The Executive view never names languages or constructs. Translate them into thei
 | Writes a LaunchDaemon | "Installs something that keeps running in the background after restarts" |
 | `profiles` / `fdesetup` / `sysadminctl` | "Changes security, encryption, or user-account settings" |
 | Obfuscated or base64-encoded payload | "Contains hidden code that we can't verify" |
+
+---
+
+## Fresh-reader check
+
+The reader sees only this view (Purpose), so test it on a reader who has seen nothing else. Run the check when the runtime offers sub-agents, after the report is saved and before the reply, in the self-check window (`attestation.md`).
+
+1. Give a fresh sub-agent only this view's body, from **In one sentence** to its last line. Give it no code, no other view, no Monocle Score section, and nothing from this conversation. Tell it to read only, to answer from the text alone as a non-technical decision-maker, and to write "not stated" when the text doesn't answer.
+2. Ask exactly three questions:
+   1. What is the recommendation, and what condition comes with it, if any?
+   2. What is the biggest risk, and does it come from the code itself or from how it is deployed?
+   3. What must you, or someone you assign, do next?
+3. Compare the answers with the report:
+   - the Monocle Score section's **Recommendation** line, level and condition;
+   - the highest-severity `S#` and its **Origin** line;
+   - the Manager view's first action item.
+4. When an answer doesn't match, rewrite the Executive wording that misled the reader, then rerun citation pass 2 and the self-check. Never change the ledger, a severity, or the score to make the answers match: the views render the ledger (`scoring-procedure.md`).
+5. Record the result in a Scope caveats bullet labeled **Executive fresh-reader check.**, followed by `matched`, `revised — {what changed}`, or `not run ({reason})`.
+   - A sub-agent that times out, errors, or returns nothing is `not run`, never `matched`.
+   - Without a sub-agent tool, record `not run (no sub-agent)`. A check in the same context isn't a fresh reader.
+   - A subset report without this view records `not run (subset)`.

@@ -71,6 +71,16 @@ ATTESTATION_KEYS_V2 = ATTESTATION_KEYS + ("deployment_context",)
 CONTEXT_REFERENCE = "monocle/references/deployment-context.md"
 CONTEXT_LINE = "**Deployment context:**"
 CONTEXT_LABELS = {"Operator-stated": "operator", "None supplied": "none"}
+SCORING_REFERENCE = "references/scoring-procedure.md"
+# The Defect classes list in references/scoring-procedure.md; --self-test fails when the two drift apart.
+DEFECT_CLASSES = (
+    "privilege-escalation", "injection", "trust-check", "integrity", "secret-exposure", "disclosure",
+    "shared-path", "gate", "exit-status", "wrong-target", "state", "dependency", "platform-variant", "docs",
+)
+KEYS_LABEL = "- **Issue keys.**"
+KEY_LINE_RE = re.compile(r"^\s+-\s+`([SNX]\d+)`\s+[—–-]+\s+`(.+)`\s*$")
+KEY_RE = re.compile(r"^(.+?)\s+·\s+([a-z-]+)$")
+KEY_LINE_NUMBER_RE = re.compile(r"^[^:]+:\d+(?:\s*[–-]\s*\d+)?$")
 COMMIT_RE = re.compile(r"^[0-9a-f]{7,40}$")
 TREE_RE = re.compile(r"^[0-9a-f]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -139,6 +149,7 @@ class Audit:
     expected_band: str = None
     rules_source: str = ""
     canonical_source: str = ""
+    issue_keys: dict = None
 
     def add(self, group, name, ok, detail, warn_only=False):
         status = "pass" if ok else ("warn" if warn_only else "fail")
@@ -217,13 +228,13 @@ def cells(line):
     return [cell.strip() for cell in line.strip().strip("|").split("|")]
 
 
-def expand_ids(text):
+def expand_ids(text, prefix="S"):
     ids = []
-    for match in re.finditer(r"\bS(\d+)(?:\s*[–-]\s*S?(\d+))?", text):
+    for match in re.finditer(rf"\b{prefix}(\d+)(?:\s*[–-]\s*{prefix}?(\d+))?", text):
         low = int(match.group(1))
         high = int(match.group(2) or low)
         if 0 <= high - low <= MAX_HISTORY:
-            ids.extend(f"S{n}" for n in range(low, high + 1))
+            ids.extend(f"{prefix}{n}" for n in range(low, high + 1))
     return ids
 
 
@@ -494,6 +505,74 @@ def check_steering(audit, report):
     detail = ("possible text aimed at the checker; judge it per verify-report.md: " + " | ".join(hits[:3])
               if hits else "no text addressed to a verifier")
     audit.add("steering", "checker-steering text", not hits, detail, warn_only=True)
+
+
+def parse_issue_keys(report):
+    """Return ({ID: key}, repeated IDs, unparseable lines) from the Scope caveats Issue keys bullet.
+
+    The first value is None when the report has no such bullet.
+    """
+    lines = report.body("Scope")
+    start = next((i for i, line in enumerate(lines) if line.startswith(KEYS_LABEL)), None)
+    if start is None:
+        return None, [], []
+    keys, repeated, malformed = {}, [], []
+    for line in lines[start + 1:]:
+        if not line.strip() or not line.startswith((" ", "\t")):
+            break
+        match = KEY_LINE_RE.match(line)
+        if not match:
+            malformed.append(line.strip()[:80])
+            continue
+        ident, key = match.groups()
+        if ident in keys:
+            repeated.append(ident)
+        keys[ident] = key
+    return keys, repeated, malformed
+
+
+def ledger_ids(report):
+    """Return the IDs the deduction table lists: S# per severity, N# for Non-security, X# for Not scored."""
+    ids = []
+    for row in report.table("Monocle Score", ("source", "ids", "count", "each", "deduction")) or []:
+        if len(row) < 2:
+            continue
+        lower = row[0].lower()
+        prefix = ("N" if lower.startswith("non-security") else "X" if lower.startswith("not scored")
+                  else "S" if word_in(row[0], SEVERITIES) else None)
+        if prefix:
+            ids.extend(expand_ids(row[1], prefix))
+    return ids
+
+
+def check_keys(audit, report):
+    """Issue keys let later runs match items (prior-reports.md). They never move the score, so problems only warn."""
+    keys, repeated, malformed = parse_issue_keys(report)
+    listed = ledger_ids(report)
+    if keys is None:
+        audit.add("structure", "issue keys", not listed,
+                  "no **Issue keys.** bullet in Scope caveats; reports from skill commits before persisted keys lack it"
+                  if listed else "no ledger rows to key", warn_only=True)
+        return
+    audit.issue_keys = keys
+    missing = [ident for ident in listed if ident not in keys]
+    extra = [ident for ident in keys if ident not in listed]
+    audit.add("structure", "issue keys complete", not (missing or repeated or malformed),
+              f"IDs without a key: {', '.join(missing) or 'none'}; repeated: {', '.join(repeated) or 'none'}; "
+              f"unparseable lines: {' | '.join(malformed[:3]) or 'none'}", warn_only=True)
+    audit.add("structure", "issue keys match the ledger", not extra,
+              f"keys for IDs the deduction table doesn't list: {', '.join(extra) or 'none'}", warn_only=True)
+    bad = []
+    for ident, key in keys.items():
+        match = KEY_RE.match(key)
+        if not match or match.group(2) not in DEFECT_CLASSES:
+            bad.append(f"{ident} has no known defect class")
+        elif ":" not in match.group(1):
+            bad.append(f"{ident} has no file:function part")
+        elif KEY_LINE_NUMBER_RE.match(match.group(1)):
+            bad.append(f"{ident} carries a line number")
+    audit.add("structure", "issue key format", not bad,
+              f"{'; '.join(bad) or 'every key is {file}:{function or anchor} · {defect class}'}", warn_only=True)
 
 
 def check_score(audit, report, rules):
@@ -820,6 +899,7 @@ def run_checks(report):
     check_structure(audit, report)
     check_attestation(audit, report)
     check_steering(audit, report)
+    check_keys(audit, report)
     return audit
 
 
@@ -851,6 +931,7 @@ def json_result(path, verdict, audit, trusted):
         "expected_score": audit.expected_final,
         "expected_band": audit.expected_band,
         "attestation": audit.attestation,
+        "issue_keys": audit.issue_keys,
         "checks": [asdict(check) for check in audit.checks],
     })
 
@@ -912,8 +993,11 @@ def verify(args):
 
 def synthetic_report(rules, critical=0, high=1, medium=1, low=2, info=1, nonsec=3,
                      each=None, final=None, attestation=True, dirty="false",
-                     version="v2", context="none", line_context=None, context_line=True):
-    """Build an in-memory report that follows the Output template."""
+                     version="v2", context="none", line_context=None, context_line=True, keys=True):
+    """Build an in-memory report that follows the Output template.
+
+    keys: True lists a generated issue key per ID, a dict lists exactly those keys, and False omits the bullet.
+    """
     charge = dict(rules.each, **(each or {}))
     counts = {"Critical": critical, "High": high, "Medium": medium, "Low": low, "Info": info}
     ids, findings, number = {}, [], 0
@@ -930,7 +1014,14 @@ def synthetic_report(rules, critical=0, high=1, medium=1, low=2, info=1, nonsec=
                     f"{charge[sev]} | {counts[sev] * charge[sev]} |")
     nonsec_deduction = min(nonsec * rules.nonsec_each, rules.nonsec_cap)
     total += nonsec_deduction
-    rows.append(f"| Non-security | example footguns | {nonsec} | {rules.nonsec_each} (max {rules.nonsec_cap}) | {nonsec_deduction} |")
+    nonsec_ids = [f"N{n}" for n in range(1, nonsec + 1)]
+    nonsec_names = ", ".join(f"{ident} example footgun" for ident in nonsec_ids) or "—"
+    rows.append(f"| Non-security | {nonsec_names} | {nonsec} | {rules.nonsec_each} (max {rules.nonsec_cap}) | {nonsec_deduction} |")
+    if keys is True:
+        keys = {ident: f"tool.sh:step_{ident[1:]} · injection" for sev in SEVERITIES for ident in ids[sev]}
+        keys.update({ident: f"tool.sh:helper_{ident[1:]} · exit-status" for ident in nonsec_ids})
+    caveats = (["**Scope caveats:**", "- **Issue keys.**", *(f"  - `{i}` — `{k}`" for i, k in keys.items()), ""]
+               if keys else [])
     rows.append("| Not scored | — | 0 | 0 | 0 |")
     raw = 100 - total
     highest = highest_severity(counts)
@@ -974,8 +1065,8 @@ def synthetic_report(rules, critical=0, high=1, medium=1, low=2, info=1, nonsec=
         "<summary>Scope: attached file — 1 file, full coverage</summary>", "",
         "| Field | Value |", "|---|---|", "| **Date** | 2026-01-01 00:00 UTC |",
         "| **Target** | tool.sh (attached file) |", "| **Ref** | attached file |",
-        "| **Generated by** | Self-test |", "| **Scope caveats** | None |", "",
-        *block, "</details>", "", "---", "", f"[Generated by Monocle]({footer_url})", "",
+        "| **Generated by** | Self-test |", f"| **Scope caveats** | {'See below' if caveats else 'None'} |", "",
+        *caveats, *block, "</details>", "", "---", "", f"[Generated by Monocle]({footer_url})", "",
     ])
 
 
@@ -1029,6 +1120,43 @@ def self_test():
     check_score(audit, report, rules)
     if decide(audit) != WEAKENED:
         problems.append(f"v1 attestation on a context-aware commit: expected {WEAKENED}, got {decide(audit)}")
+
+    # Issue keys: a complete bullet passes; gaps, line-numbered keys, and unknown classes only warn,
+    # and none of them moves the verdict.
+    key_cases = (
+        ("complete keys", {}, {}),
+        ("a scored ID without a key", {"high": 2, "medium": 0, "low": 0, "info": 0, "nonsec": 1,
+                                       "keys": {"S1": "tool.sh:main · injection", "N1": "tool.sh:log · exit-status"}},
+         {"issue keys complete": "warn"}),
+        ("a key with a line number", {"high": 1, "medium": 0, "low": 0, "info": 0, "nonsec": 0,
+                                      "keys": {"S1": "tool.sh:42 · injection"}}, {"issue key format": "warn"}),
+        ("a key with an unknown class", {"high": 1, "medium": 0, "low": 0, "info": 0, "nonsec": 0,
+                                         "keys": {"S1": "tool.sh:main · typo"}}, {"issue key format": "warn"}),
+        ("a key for an unlisted ID", {"high": 1, "medium": 0, "low": 0, "info": 0, "nonsec": 0,
+                                      "keys": {"S1": "tool.sh:main · injection", "X9": "tool.sh:old · docs"}},
+         {"issue keys match the ledger": "warn"}),
+        ("no keys bullet", {"keys": False}, {"issue keys": "warn"}),
+        ("no keys bullet and no rows", {"high": 0, "medium": 0, "low": 0, "info": 0, "nonsec": 0, "keys": False},
+         {"issue keys": "pass"}),
+    )
+    for name, options, wanted in key_cases:
+        report = Report(synthetic_report(rules, **options))
+        audit = run_checks(report)
+        stub_provenance(audit)
+        check_score(audit, report, rules)
+        statuses = {c.name: c.status for c in audit.checks if c.name.startswith("issue key")}
+        expected_statuses = {name_: wanted.get(name_, "pass") for name_ in statuses}
+        if not statuses or statuses != expected_statuses or not set(wanted) <= set(statuses):
+            problems.append(f"issue keys, {name}: expected {wanted or 'all pass'}, got {statuses}")
+        if decide(audit) != OFFICIAL:
+            problems.append(f"issue keys, {name}: a key problem changed the verdict to {decide(audit)}")
+
+    # The defect classes the checker accepts are the ones scoring-procedure.md lists.
+    scoring_text = (skill_dir / SCORING_REFERENCE).read_text(encoding="utf-8")
+    section = scoring_text.split("## Defect classes", 1)[-1].split("\n## ", 1)[0]
+    listed_classes = tuple(re.findall(r"^- `([a-z-]+)`", section, re.MULTILINE))
+    if listed_classes != DEFECT_CLASSES:
+        problems.append(f"defect classes: {SCORING_REFERENCE} lists {listed_classes}; verify_report.py has {DEFECT_CLASSES}")
 
     # Report text can't rewrite the checker's own output: an ANSI erase-line or a bidi override in a
     # steering line, or in the attestation, comes out escaped in both the text and the JSON form.
@@ -1094,8 +1222,8 @@ def self_test():
 
     for problem in problems:
         print(f"FAIL {problem}")
-    print(f"self-test: {len(cases)} verdict cases, context-version downgrade, output escaping, non-regular input, "
-          f"manifest format, scoring-doc sync — "
+    print(f"self-test: {len(cases)} verdict cases, {len(key_cases)} issue-key cases, defect-class sync, "
+          f"context-version downgrade, output escaping, non-regular input, manifest format, scoring-doc sync — "
           f"{'all passed' if not problems else f'{len(problems)} problem(s)'}")
     return 1 if problems else 0
 

@@ -1,0 +1,28 @@
+{
+  "description": "Root works in /tmp and writes under /Library/Logs, but through mktemp -d, an ownership check, and an atomic mv. Tests Refute before freeze: a path that looks risky must not become a finding.",
+  "deployment_context": null,
+  "prompt_suffix": "",
+  "expect": {
+    "score_range": [70, 100],
+    "bands": ["Excellent", "Good"],
+    "overall_risk": "Low",
+    "no_other_findings": false,
+    "findings": [],
+    "not_scored": [],
+    "refuted": [
+      {
+        "class": "shared-path",
+        "file": "save-installd-log.zsh",
+        "rationale": "Informational. A run that raises the /tmp work directory as a candidate should refute it and list it under Refuted candidates, citing the mktemp -d line. A run that never raises it is also correct."
+      }
+    ],
+    "must_not_flag": [
+      {
+        "class": "shared-path",
+        "file": "save-installd-log.zsh",
+        "rationale": "mktemp -d gives a fresh, unpredictable, 0700 directory; umask 077 makes the log root-only; the destination directory is checked for a symlink and root ownership; and mv -f into it renames instead of following a planted link. Only an admin can change /Library/Logs, which already implies equivalent power."
+      }
+    ]
+  },
+  "rationale": "With no Low or higher Security finding, the score stays in 70-100 and Overall risk is Low."
+}
