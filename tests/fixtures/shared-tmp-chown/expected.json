@@ -1,0 +1,23 @@
+{
+  "description": "Root writes a fixed name in /tmp, then chowns it to the console user. Tests the shared-directory trust checks and the High rating for a no-race local privilege escalation.",
+  "deployment_context": null,
+  "prompt_suffix": "",
+  "expect": {
+    "score_range": [25, 69],
+    "bands": ["Fair", "Poor"],
+    "overall_risk": "High",
+    "no_other_findings": false,
+    "findings": [
+      {
+        "class": "shared-path",
+        "file": "prepare-support-summary.zsh",
+        "severity": "High",
+        "rationale": "SKILL.md Step 4, Shared-directory trust: '>' and chown (without -h) follow symlinks, and the name is fixed. Q2: a local non-admin user plants a symlink at /tmp/support-summary.txt before the run; root writes through it and then chowns the link's target to that user, who gains ownership of a root file; control: none (no -L check, no ownership check, no mktemp). Q3: the documented deployment runs this path. Q4: matches the High example 'Local privilege escalation to root that needs no race (a link or file planted before the run)'. Likelihood Expected (it gains root). No adjustment: the README leaves scope to the admin, so no fleet-wide raise. The '>' write, chown, and chmod on the same fixed path are one issue (distinct-issue test 1, same missing control)."
+      }
+    ],
+    "not_scored": [],
+    "refuted": [],
+    "must_not_flag": []
+  },
+  "rationale": "One High finding gives 100 - 20 = 80, capped at 69 by the High range; non-security rows can lower it toward 49. Overall risk equals the highest headline severity, High."
+}

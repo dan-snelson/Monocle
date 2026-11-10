@@ -51,10 +51,11 @@ Use exactly this structure:
 - **Location:** `file:line` (or function name)
 - **Origin:** {Code | Platform | Deployment, or a combination} — {one sentence: the platform behavior or configuration choice involved, and what the code already does about it} (see SKILL.md Rule 13)
 - **Context:** {Mitigated by deployment context — {context item}; {alternate severity} outside it | Raised by deployment context — {context item} | Independent of deployment model}
-- **Severity basis:** {path through the Decision procedure, e.g. "Q2: a local user gets root code execution; Q3: the documented baseline closes the precondition → Low; alternate High"}
+- **Severity basis:** {path through the Decision procedure, naming the intended control, e.g. "Q2: a local user gets root code execution; control: an owner check that skips parent directories; Q3: the documented baseline closes the precondition → Low; alternate High"}
 - **Evidence:** `{short code quote, secrets redacted}`
 - **Impact:** {What an attacker or failure can achieve, and against what}
 - **Fix:** {Specific change — command, flag, or pattern to use instead}
+- **To confirm:** {Only for a row labeled inferred (SKILL.md Rule 3): the isolated check (Rule 4), or the read-only fact an admin can observe, that settles it. Omit the line otherwise}
 
 {repeat for each finding}
 
@@ -135,7 +136,7 @@ Answer these questions in order for each ledger row (`scoring-procedure.md`) bef
 - **Q0 — Capability?** If the row is about a high-impact operation *being available* (EDR removal, data deletion, app removal), run the Rule 14 checklist in `scoring-procedure.md` and use its outcome (SKILL.md Rule 14). Defects in how the code performs the operation skip Q0.
 - **Q1 — Credential?** Use **Credential severity** below. Its rating is final except for Q3 (see the last bullet under **Credential severity**); adjustments don't apply.
 - **Q1b — Floors.** A silent failure in a security or compliance control is at least 🟡 Medium, for example a FileVault enforcement script that exits 0 on error, or a firewall-enable step whose failure is swallowed. So is non-production data that reaches production compliance records. The floor binds the Q4–Q5 rating. When Q3 finds that the deployment never runs the path or closes its precondition, Q3 sets the headline and the floor applies to the alternate.
-- **Q2 — Gain.** Name the attacker (a non-admin local user, a network attacker, or a remote party), the precondition, and the gain.
+- **Q2 — Gain.** Name the attacker (a non-admin local user, a network attacker, or a remote party), the precondition, the intended control and why it doesn't stop the attack ("control: none" when the path has none), and the gain. `scoring-procedure.md`, Refute before freeze, tests the control before you freeze.
   - ⚪ **Info** applies only when the gain isn't security-relevant even with the precondition met: something cosmetic, the availability of a non-security feature, or data the attacker can already read. Credits and observations are also Info.
   - A **self-scoped and backstopped** row (**Likelihood** above) is ⚪ Info: the actor only gives up a non-security nudge, or misreports their own Mac, while the platform still enforces the outcome. The walk ends here. The Q1b floor doesn't bind, and the code's safer source (for example, a root-owned state file) goes in **Fix** as hardening. The row has no alternate unless a setting that ships off adds an effect that isn't self-scoped, such as a Force restart mode that lets the forged text restart the Mac. Treat that setting as a Q3 condition: the headline stays ⚪ Info, and the alternate is what Q4–Q5 give for the added effect with the setting on. Keep one row (distinct-issue test 1) and give it an Operator baseline bullet.
   - Otherwise the row is at least 🔵 Low. A security-relevant gap with a concrete code fix is never Info.
@@ -203,7 +204,7 @@ Why it's weak: no location, no evidence, no specific impact, and a generic fix.
 - **Location:** `install.zsh:57`
 - **Origin:** Code — the script pipes a mutable remote branch into a root shell; nothing in the platform or deployment requires it, and the code does no integrity check.
 - **Context:** Independent of deployment model
-- **Severity basis:** Q2: anyone who can push to `example/tools` `main`, or tamper with DNS/TLS on the client network, gets root code execution; Q4: matches the Critical example `curl http://… | sudo bash`
+- **Severity basis:** Q2: anyone who can push to `example/tools` `main`, or tamper with DNS/TLS on the client network, gets root code execution; control: none (no hash, signature, or pinned ref on the path); Q4: matches the Critical example `curl http://… | sudo bash`
 - **Evidence:** `curl -sL "https://raw.githubusercontent.com/example/tools/main/setup.sh" | /bin/bash`
 - **Impact:** Runs as root on every Mac the Jamf policy is scoped to. Anyone who can push to `example/tools` `main` gets root code execution on those Macs, and the branch is mutable, so content can change between runs.
 - **Fix:** Vendor `setup.sh` into this repo, or pin to a commit SHA and verify it before running: download to `mktemp`, check with `shasum -a 256 -c`, then execute. Add `--fail --proto '=https' --tlsv1.2`.

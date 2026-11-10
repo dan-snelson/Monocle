@@ -1,0 +1,31 @@
+{
+  "description": "A fleet-scoped Jamf Pro API client secret arrives in Parameter 6, and the bearer token goes on curl's command line. Tests Credential severity, the Platform + Deployment origin, and the distinct-issue test for two exposures with different fixes.",
+  "deployment_context": null,
+  "prompt_suffix": "",
+  "expect": {
+    "score_range": [25, 69],
+    "bands": ["Fair", "Poor"],
+    "overall_risk": "High",
+    "no_other_findings": false,
+    "findings": [
+      {
+        "class": "secret-exposure",
+        "file": "set-asset-tag.zsh",
+        "function": ["$6", "client_secret", "Parameter 6"],
+        "severity": "High",
+        "rationale": "Q1, Credential severity: 'Jamf parameter $4-$11, while a policy populates it' with fleet-wide write scope (the README's API role has Update Computers and the policy is scoped to All Computers) gives High, Origin Platform + Deployment. The code accepts the secret only through Parameter 6, so the populated-parameter rating is the headline (Credential severity, second bullet). Adjustments never apply to credential rows. The function selector pins this row to the Parameter 6 secret, so a second row about the same exposure can't stand in for the bearer-token row."
+      },
+      {
+        "class": "secret-exposure",
+        "file": "set-asset-tag.zsh",
+        "function": ["bearer", "$token"],
+        "severity": "High",
+        "rationale": "The bearer token is passed with --oauth2-bearer on curl's command line, so every local user can read it in ps while curl runs (SKILL.md Step 4, Secrets: Authorization headers on the command line). Q4: matches the High example 'curl -u admin:pass visible in ps' (same sink, same gain: a credential with Update Computers scope). Origin Code. It is a separate issue from the Parameter 6 exposure: no single edit closes both (distinct-issue test 5). The function selector pins this row to the --oauth2-bearer argument."
+      }
+    ],
+    "not_scored": [],
+    "refuted": [],
+    "must_not_flag": []
+  },
+  "rationale": "Two High findings give 100 - 40 = 60, inside the High range (25-69). The client secret itself goes to curl on stdin through the printf builtin, so it is not on any command line; a finding that says it is would be a false positive."
+}

@@ -587,21 +587,37 @@ jobs:
         shell: bash
         run: python3 monocle/scripts/verify_report.py --self-test
 
+      - name: Run Skill Structure Checks
+        id: structure
+        continue-on-error: true
+        shell: bash
+        run: python3 .github/scripts/check_skill_structure.py
+
+      - name: Run Fixture Grader Self-Test
+        id: grader
+        continue-on-error: true
+        shell: bash
+        run: python3 tests/grade_report.py --self-test
+
       - name: Finalize Skill Integrity Result
         if: success() || failure()
         shell: bash
         env:
           INTEGRITY_OUTCOME: ${{ steps.integrity.outcome }}
           VERIFIER_OUTCOME: ${{ steps.verifier.outcome }}
+          STRUCTURE_OUTCOME: ${{ steps.structure.outcome }}
+          GRADER_OUTCOME: ${{ steps.grader.outcome }}
         run: |
           {
             echo "### Skill Integrity"
             echo
-            echo "- Coverage: hidden or bidirectional Unicode in all tracked text files, HTML comments in tracked Markdown, tracked Monocle reports, the /reports/ gitignore rule, tracked \`.claude/settings.local.json\`, and the \`verify_report.py --self-test\` (verdict cases, manifest format, scoring-doc sync)."
+            echo "- Coverage: hidden or bidirectional Unicode in all tracked text files, HTML comments in tracked Markdown, tracked Monocle reports, the /reports/ gitignore rule, tracked \`.claude/settings.local.json\`, and the \`verify_report.py --self-test\` (verdict cases, issue keys, manifest format, scoring-doc sync)."
+            echo "- Structure: the SKILL.md byte budget and frontmatter limits, reference pointers and the README Layout, reference house format, safety sentinels, and relative links (\`.github/scripts/check_skill_structure.py\`)."
+            echo "- Fixtures: every \`tests/fixtures/*/expected.json\` schema and the grader's own cases (\`tests/grade_report.py --self-test\`). Live fixture runs are opt-in and don't run in CI."
             echo
           } >> "${GITHUB_STEP_SUMMARY}"
 
-          if [[ "${INTEGRITY_OUTCOME}" == "success" && "${VERIFIER_OUTCOME}" == "success" ]]; then
+          if [[ "${INTEGRITY_OUTCOME}" == "success" && "${VERIFIER_OUTCOME}" == "success" && "${STRUCTURE_OUTCOME}" == "success" && "${GRADER_OUTCOME}" == "success" ]]; then
             echo "✅ Skill integrity checks passed" >> "${GITHUB_STEP_SUMMARY}"
             exit 0
           fi
@@ -641,9 +657,9 @@ jobs:
 
           line="Semgrep $(badge "${SEMGREP_RESULT}") | Gitleaks $(badge "${GITLEAKS_RESULT}") | Snippet Syntax $(badge "${SNIPPET_SYNTAX_RESULT}") | ShellCheck $(badge "${SHELLCHECK_RESULT}") | Skill Integrity $(badge "${SKILL_INTEGRITY_RESULT}")"
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-            coverage="Coverage: monocle/SKILL.md, monocle/references/, and their fenced commands, plus pull-request diff-aware Semgrep, full-history Gitleaks, and report-hygiene checks."
+            coverage="Coverage: monocle/SKILL.md, monocle/references/, and their fenced commands, plus pull-request diff-aware Semgrep, full-history Gitleaks, and report-hygiene, skill-structure, and fixture-schema checks."
           else
-            coverage="Coverage: monocle/SKILL.md, monocle/references/, and their fenced commands, plus full-repository Semgrep, full-history Gitleaks, and report-hygiene checks."
+            coverage="Coverage: monocle/SKILL.md, monocle/references/, and their fenced commands, plus full-repository Semgrep, full-history Gitleaks, and report-hygiene, skill-structure, and fixture-schema checks."
           fi
 
           result="passed"
