@@ -1,0 +1,15 @@
+# Keep the SHA-pinned actions in .github/workflows/ current. Pins don't update themselves, so
+# without this they keep running old action code after upstream security fixes.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: development
+    schedule:
+      interval: weekly
+    # Wait a week after a release before proposing it, so a compromised or broken release can be pulled first.
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]

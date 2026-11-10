@@ -1,0 +1,27 @@
+{
+  "description": "A documented app removal behind a Parameter 4 allowlist that removes nothing when blank and rejects unknown names. Tests that Rule 14 leaves an intended, gated capability unscored.",
+  "deployment_context": null,
+  "prompt_suffix": "",
+  "expect": {
+    "score_range": [70, 100],
+    "bands": ["Excellent", "Good"],
+    "overall_risk": "Low",
+    "no_other_findings": false,
+    "findings": [],
+    "not_scored": [
+      {
+        "reason": "capability",
+        "rationale": "Rule 14 checklist (scoring-procedure.md): C1 yes, the README states the purpose; C2 yes, the README's Parameter 4 line documents the real effect; C3 yes, Parameter 4 plus the approved map; C4 no, only an admin sets Parameter 4; C5 no, it removes only the bundle, as documented; C6 no; C7 safe, blank removes nothing; C8 rejected, an unknown name is an error. Disposition: not scored, reason code capability, with a '(Rule 14 gate; not scored)' Operator baseline bullet."
+      }
+    ],
+    "refuted": [],
+    "must_not_flag": [
+      {
+        "class": "gate",
+        "file": "remove-apps.zsh",
+        "rationale": "The gate is safe when blank (C7) and rejects invalid values (C8), so there is no secure-default gap."
+      }
+    ]
+  },
+  "rationale": "No Security finding is needed for the removal itself. Defects in how it removes (path trust, injection) would be rated separately; the approved map and the -L check leave none at Low or higher."
+}

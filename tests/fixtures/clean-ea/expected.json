@@ -1,0 +1,16 @@
+{
+  "description": "A read-only Extension Attribute with explicit error handling. Tests that a clean target stays clean: no padded findings (SKILL.md Rule 7).",
+  "deployment_context": null,
+  "prompt_suffix": "",
+  "expect": {
+    "score_range": [70, 100],
+    "bands": ["Excellent", "Good"],
+    "overall_risk": "Low",
+    "no_other_findings": true,
+    "findings": [],
+    "not_scored": [],
+    "refuted": [],
+    "must_not_flag": []
+  },
+  "rationale": "The script runs as root but only reads I/O Registry data, uses absolute binary paths and a fixed PATH, checks the ioreg exit status, and prints one <result> on every path (patterns.md, Extension Attributes). No Step 4 area has a hit, so no Security finding reaches Low, and Overall risk is Low (security.md, Decision procedure: 'or Low when no finding is Low or higher')."
+}

@@ -12,10 +12,10 @@ A fully worked Monocle Score calculation for SKILL.md Step 5. It shows the issue
 
   | ID | Finding | Severity basis | Rating | Points |
   |---|---|---|---|---|
-  | S1 | Root installs packages from a user-writable staging directory with a name-only signature check, and re-reads the directory after a long download | Q2: a local user gets root code execution; nothing in the deployment closes it; Q5 High. Both gaps belong to one trust check (distinct-issue test 1) | 🟠 High (Code defect) | 20 |
+  | S1 | Root installs packages from a user-writable staging directory with a name-only signature check, and re-reads the directory after a long download | Q2: a local user gets root code execution; control: a name-only signature check, which any package with the expected name passes; nothing in the deployment closes it; Q5 High. Both gaps belong to one trust check (distinct-issue test 1) | 🟠 High (Code defect) | 20 |
   | S2 | — | — | 🟡 Medium | 8 |
   | S3 | EDR removal and full app removal are offered when the allowlist parameter is blank | Q0, Rule 14 checklist: C1–C6 pass, C7 offers everything → secure-default gap | 🔵 Low | 3 |
-  | S4 | Root runs `/usr/local/bin/dialog` | Q2: root code execution if the directory is user-owned; Q3: the platform default (root-owned on Apple silicon) closes the precondition | 🔵 Low | 3 |
+  | S4 | Root runs `/usr/local/bin/dialog` | Q2: root code execution if the directory is user-owned; control: none (no owner check before the run); Q3: the platform default (root-owned on Apple silicon) closes the precondition | 🔵 Low | 3 |
   | S5–S7 | — | — | 🔵 Low | 9 |
   | S8 | A tracked self-extracting wrapper | Q3: the documentation deploys the main script, never the wrapper | ⚪ Info | 0 |
   | S9 | — | — | ⚪ Info | 0 |
@@ -29,9 +29,9 @@ A fully worked Monocle Score calculation for SKILL.md Step 5. It shows the issue
 - **Headline:** 100 − 61 = **39/100 (🟠 Poor)**. The High range (25–69) doesn't bind.
 - **Alternate:** every Operator baseline condition that flips a finding fails at once: some interactive policy leaves the allowlist blank, `/usr/local/bin` is user-owned, and the wrapper is deployed. Then S3 is High (Q5: a standard user runs a root-only removal, rated as privilege escalation for that operation), S4 High (Q4: root runs a binary a standard user can replace; no race), and S8 Medium (Q5: root writes a fixed shared path and runs it; a pre-planted file still needs a rewrite between root's write and run, so High's no-race test fails and Medium's race criterion matches): 100 − (85 + 18) leaves 0, **floored at 25 → 25/100 (🟠 Poor)**.
 - **Operator baseline:**
-  - Every interactive policy sets an allowlist that excludes EDR removal (README.md:{n}) (S3 → High if not).
-  - `/usr/local/bin` is root-owned on every Mac in scope (patterns.md: Intel `/usr/local/bin` can be user-owned) (S4 → High if not).
-  - Every policy runs the main script, not the wrapper (README.md:{n}) (S8 → Medium if not).
+  - Every interactive policy sets an allowlist that excludes EDR removal (README.md:{n}) (S3 → High if not); check: Jamf Pro → Policies → each Self Service policy → Scripts → the allowlist parameter is set and omits EDR removal.
+  - `/usr/local/bin` is root-owned on every Mac in scope (patterns.md: Intel `/usr/local/bin` can be user-owned) (S4 → High if not); check: `ls -ld /usr/local/bin` shows owner `root`.
+  - Every policy runs the main script, not the wrapper (README.md:{n}) (S8 → Medium if not); check: Jamf Pro → Policies → each policy's Scripts payload names the main script, not the wrapper.
 
 ---
 
@@ -49,7 +49,7 @@ A fully worked Monocle Score calculation for SKILL.md Step 5. It shows the issue
 - **Headline:** 82/100 (🔵 Good), at the operator-stated deployment context. The Low range (70–100) doesn't bind.
 - **Alternate:** every Operator baseline condition fails at once (another local account exists, and shared staging is writable beyond the team): 67/100 (🟡 Fair), inside the Medium range (50–89). The documented baseline (72) isn't shown as a third score; the Deployment context lines say what the context changed.
 - **Operator baseline:**
-  - No other local accounts on the Mac (operator-stated) (S1 → Medium if not).
-  - Staging stays local; shared staging is out of scope (operator-stated) (S3 → Medium, N7 scored, if not).
+  - No other local accounts on the Mac (operator-stated) (S1 → Medium if not); check: `dscl . -list /Users UniqueID | awk '$2 >= 501'` lists only the admin.
+  - Staging stays local; shared staging is out of scope (operator-stated) (S3 → Medium, N7 scored, if not); check: the configured staging path is on the internal disk and outside synced folders (`df -P {path}`).
 - **The redaction gap is independent of deployment model.** No context item negates its precondition, so it keeps its rating in all three columns.
 - **Context can also raise.** Had the operator also said the tool ships in the enrollment prestage to every Mac, Adjustment 1 would raise the one finding Q3 didn't set, the redaction gap (S2), to 🟡 Medium: 100 − 23 = **77/100 (🔵 Good)**. The Q3 ratings don't move.

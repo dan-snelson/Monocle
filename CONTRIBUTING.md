@@ -42,8 +42,12 @@ The security scan workflow checks:
 - fenced `bash`, `sh`, `zsh`, and `python` blocks in tracked Markdown
 - ShellCheck for fenced `bash` and `sh` blocks
 - skill integrity, including hidden Unicode, HTML comments in Markdown, tracked reports, `/reports/` ignore coverage, local agent settings, and the `verify_report.py --self-test`
+- skill structure with `.github/scripts/check_skill_structure.py`: the SKILL.md byte budget, frontmatter limits, reference pointers and the README Layout, the reference house format, safety sentinels, and relative links
+- calibration fixtures with `tests/grade_report.py --self-test`
 
-Run the relevant local checks before opening a PR when practical. At minimum, review Markdown rendering and run `git diff --check`. If you change fenced shell or Python examples, run the same syntax checks described by the workflow.
+Run the offline checks in [TESTING.md](TESTING.md) before opening a PR. At minimum, review Markdown rendering and run `git diff --check`. If you change fenced shell or Python examples, run the same syntax checks described by the workflow.
+
+If a change moves a rating on purpose, update the matching `tests/fixtures/*/expected.json` and its rationale in the same PR. Live fixture runs (`tests/run_live.py`) use model quota and are optional; when you run them, add the results to the run record in `TESTING.md`.
 
 ## Feature Requests and Bug Reports
 

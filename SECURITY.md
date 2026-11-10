@@ -71,6 +71,7 @@ You should receive an acknowledgment within **48 hours**. We will work with you 
 - `verify_report.py` treats the report as untrusted input:
   - It passes only strictly validated commit hashes to `git`, as list arguments with no shell.
   - It reads the fetched repository through git plumbing, without a checkout.
+  - It escapes control, bidi, and zero-width characters in every string it prints, text or `--json`, so report text can't rewrite or hide its output, and it refuses a report path that isn't a regular file without blocking.
   - Its `--self-test` runs in CI.
   - Report attestations are self-asserted, not signed; `references/verify-report.md` states what a verdict can and can't prove.
 - Changes are reviewed with attention to shell quoting in documented commands, untrusted-input handling, report destinations, and what post-chat-refine may write.
