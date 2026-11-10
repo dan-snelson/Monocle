@@ -20,7 +20,7 @@
     - Adapted from the privileged-helper, local-IPC, and deep-link classes in Cloudflare's [security-audit](https://github.com/cloudflare/security-audit-skill) skill (`DESKTOP-MOBILE-AND-LOCAL-IPC.md`), rewritten for macOS APIs
 - Release pipelines adds GitHub Actions expression injection, `pull_request_target` and `workflow_run` jobs that run pull-request code with trusted tokens, cache and artifact handoffs into release jobs, and token scope without a `permissions:` block. It triggers for any workflow that holds a secret or write token
     - Adapted from the CI and automation classes in Cloudflare's [security-audit](https://github.com/cloudflare/security-audit-skill) skill (`SUPPLY-CHAIN-AND-RELEASE.md`)
-- Rule 4 isolated checks run in the scratch directory under `env -i`, and record only the command and result, with the host account and home path redacted
+- Rule 4 isolated checks run in the scratch directory under `env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin` (the shell's fallback `PATH` omits `/usr/sbin`), and record only the command and result, with the host account and home path redacted
     - Adapted from the execution-safety rules in Cloudflare's [security-audit](https://github.com/cloudflare/security-audit-skill) skill: start from an empty environment, and never record the ambient environment or unrelated host paths
 - `verify_report.py` escapes control, bidi, and zero-width characters in everything it prints, text and `--json`, so a forged report can't rewrite or hide the checker's warnings. It refuses a report path that isn't a regular file (a FIFO, device, or directory) without blocking. `--self-test` covers both
     - Modeled on the zero-dependency validators in Cloudflare's [security-audit](https://github.com/cloudflare/security-audit-skill) skill, which escape unsafe characters in diagnostics and refuse FIFOs and other non-regular input
@@ -41,7 +41,11 @@
 - Calibration fixtures
     - New `tests/fixtures/`: seven small synthetic targets, each with the ledger a correct run should produce and a rationale that walks the Decision procedure
     - New `tests/grade_report.py` grades a report against a fixture (PASS, DRIFT, or FAIL) and compares the ledgers of two runs on one target. Its `--self-test` validates every fixture and runs in CI
+    - Two rows with one issue key fail grading, and expected findings that share a file and defect class need distinct `function` selectors, so a duplicate row can't stand in for a missing one
+    - `compare` reports changed keys, dispositions, Not scored reasons, and refuted candidates, and no longer pairs two different functions in one file and class as the same row
     - New `tests/run_live.py` (opt-in, uses model quota) runs Monocle headless on the fixtures in fresh workspaces that hold only the target, then grades and compares the reports
+    - Claude Code runs load only project settings and no MCP servers, and a run refuses to start while `~/monocle-reports` holds a report or saved context for the fixture target name
+    - A run that exits non-zero, times out, or ends with an error result is FAIL, even when its report grades PASS
     - New `TESTING.md` with the offline checks, the live runs, and a run record
     - Modeled on elephant-goldfish-model's per-skill `test_scenarios.yaml`, its opt-in live harness tests, and the harness test record in its `TESTING.md`
 

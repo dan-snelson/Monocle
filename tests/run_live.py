@@ -8,6 +8,12 @@ target/ directory. The agent never sees expected.json or the fixture's name: the
 is a fresh reader too. The skill comes from this checkout, so the report's attestation
 records this checkout's commit and whether monocle/ has local edits.
 
+Personal state stays out: Claude Code loads only the workspace's project settings (no
+user CLAUDE.md, hooks, plugins, or MCP servers), and the run refuses to start while
+$HOME/monocle-reports holds a report or saved context for the target name every fixture
+uses, since the skill reads that folder too. A run that exits non-zero, times out, or
+ends with an error result is FAIL, even when the report it left behind grades PASS.
+
 Reports are copied to the gitignored reports/fixtures/ directory, graded with
 tests/grade_report.py, compared across repeats, and summarized as a row to paste into
 the run record in TESTING.md.
@@ -37,6 +43,10 @@ SKILL_HOMES = {"claude": Path.home() / ".claude" / "skills", "codex": Path.home(
 PROJECT_SKILLS = {"claude": Path(".claude") / "skills", "codex": Path(".agents") / "skills"}
 # Claude Code tools Monocle needs; dontAsk denies everything else without prompting.
 CLAUDE_TOOLS = "Bash,Read,Write,Edit,Glob,Grep"
+# Every fixture is reviewed as ./target, so the skill's {target} name is the same for all of them.
+TARGET_NAME = "target"
+# Older Monocle versions saved here, and SKILL.md Step 5 still checks it for prior reports and contexts.
+LEGACY_REPORTS = Path.home() / "monocle-reports"
 
 
 def load_grader():
@@ -61,18 +71,50 @@ def agent_version(agent):
 
 
 def skill_source(agent):
-    """Return the workspace-relative skills directory to link, or None when the personal install is this checkout."""
+    """Return the workspace-relative skills directory to link the skill into, or None when no link is needed.
+
+    Claude Code runs load only project settings, so the skill is always linked into the workspace.
+    Codex reads the personal install, so it is linked only when there is none.
+    """
     personal = SKILL_HOMES[agent] / "monocle"
     if personal.exists() or personal.is_symlink():
-        if personal.resolve() == SKILL_DIR.resolve():
+        if personal.resolve() != SKILL_DIR.resolve():
+            raise SystemExit(f"run_live.py: {personal} is a different Monocle ({personal.resolve()}), and it would "
+                             f"answer instead of this checkout. Move it aside, or replace it with a symlink to {SKILL_DIR}.")
+        if agent != "claude":
             return None
-        raise SystemExit(f"run_live.py: {personal} is a different Monocle ({personal.resolve()}), and it would answer "
-                         f"instead of this checkout. Move it aside, or replace it with a symlink to {SKILL_DIR}.")
     return PROJECT_SKILLS[agent]
 
 
+def personal_state():
+    """Return files in the legacy reports folder that the skill would read on a fixture run."""
+    found = sorted(LEGACY_REPORTS.glob(f"monocle-{TARGET_NAME}-*.md"))
+    context = LEGACY_REPORTS / "contexts" / f"{TARGET_NAME}.md"
+    return found + ([context] if context.exists() else [])
+
+
+def claude_result_problem(stdout):
+    """Return why a Claude Code JSON result shows an unfinished run, or None when it finished."""
+    try:
+        result = json.loads(stdout)
+    except ValueError:
+        return "agent output isn't a JSON result"
+    if isinstance(result, list):  # some versions print every message; the result is the last one
+        result = next((item for item in reversed(result) if isinstance(item, dict) and item.get("type") == "result"),
+                      None)
+    if not isinstance(result, dict):
+        return "agent output has no JSON result"
+    if result.get("is_error") or result.get("subtype", "success") != "success":
+        return f"agent result: {result.get('subtype') or 'no subtype'}, is_error {bool(result.get('is_error'))}"
+    return None
+
+
+def add_note(outcome, text):
+    outcome["note"] = f"{outcome['note']}; {text}" if outcome["note"] else text
+
+
 def build_prompt(agent, expected):
-    prompt = ("/monocle" if agent == "claude" else "$monocle") + " ./target"
+    prompt = ("/monocle" if agent == "claude" else "$monocle") + f" ./{TARGET_NAME}"
     if expected.get("deployment_context"):
         prompt += "\n\nDeployment context:\n" + expected["deployment_context"]
     return prompt + (expected.get("prompt_suffix") or "")
@@ -80,7 +122,7 @@ def build_prompt(agent, expected):
 
 def run_one(agent, link, case_dir, expected, number, args, grader, stamp):
     workspace = Path(tempfile.mkdtemp(prefix="monocle-live-"))
-    shutil.copytree(case_dir / "target", workspace / "target")
+    shutil.copytree(case_dir / "target", workspace / TARGET_NAME)
     reports = workspace / "reports"
     reports.mkdir()
     if link:
@@ -89,7 +131,9 @@ def run_one(agent, link, case_dir, expected, number, args, grader, stamp):
 
     prompt = build_prompt(agent, expected)
     if agent == "claude":
+        # Project settings only: no user CLAUDE.md, hooks, plugins, or skills, and no MCP servers.
         command = ["claude", "-p", prompt, "--permission-mode", "dontAsk", "--allowedTools", CLAUDE_TOOLS,
+                   "--setting-sources", "project", "--strict-mcp-config",
                    "--no-session-persistence", "--output-format", "json"]
         if args.max_budget_usd:
             command += ["--max-budget-usd", str(args.max_budget_usd)]
@@ -102,18 +146,22 @@ def run_one(agent, link, case_dir, expected, number, args, grader, stamp):
     env = dict(os.environ, MONOCLE_REPORTS_DIR=str(reports))
     outcome = {"case": case_dir.name, "run": number, "workspace": str(workspace), "report": None,
                "verdict": "FAIL", "final": None, "note": ""}
+    completed = False
     try:
         proc = subprocess.run(command, cwd=workspace, env=env, capture_output=True, text=True, timeout=args.timeout)
         (workspace / "agent-stdout.txt").write_text(proc.stdout, encoding="utf-8")
         (workspace / "agent-stderr.txt").write_text(proc.stderr, encoding="utf-8")
-        if proc.returncode:
-            outcome["note"] = f"agent exited {proc.returncode}"
+        problem = (f"agent exited {proc.returncode}" if proc.returncode
+                   else claude_result_problem(proc.stdout) if agent == "claude" else None)
+        completed = problem is None
+        if problem:
+            add_note(outcome, problem)
     except subprocess.TimeoutExpired:
-        outcome["note"] = f"timed out after {args.timeout}s"
+        add_note(outcome, f"timed out after {args.timeout}s")
 
     written = sorted(reports.glob("monocle-*.md"), key=lambda path: path.stat().st_mtime)
     if not written:
-        outcome["note"] = (outcome["note"] + "; " if outcome["note"] else "") + "no report written"
+        add_note(outcome, "no report written")
         return outcome
     SAVED.mkdir(parents=True, exist_ok=True)
     saved = SAVED / f"{agent}-{case_dir.name}-{stamp}-{number}.md"
@@ -122,6 +170,11 @@ def run_one(agent, link, case_dir, expected, number, args, grader, stamp):
     result = grader.grade(saved.read_text(encoding="utf-8"), expected)
     outcome.update(verdict=result["verdict"], final=result["final"])
     print(grader.render_grade(result, saved, case_dir / "expected.json"))
+    if not completed:
+        # TESTING.md: an unfinished run is not a pass, whatever the report it left behind grades.
+        outcome["verdict"] = "FAIL"
+        add_note(outcome, f"report graded {result['verdict']}, but the run didn't finish")
+        print(f"Verdict for this run: FAIL ({outcome['note']})")
     print()
     return outcome
 
@@ -155,6 +208,10 @@ def main(argv=None):
     if problems:
         parser.error("fix the fixtures first:\n" + "\n".join(problems))
     link = skill_source(args.agent)
+    leaks = personal_state()
+    if leaks:
+        parser.error(f"{LEGACY_REPORTS} holds files the skill would read for ./{TARGET_NAME}, so the runs wouldn't be "
+                     "independent. Move them aside first:\n" + "\n".join(str(path) for path in leaks))
 
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M")
     version = agent_version(args.agent)

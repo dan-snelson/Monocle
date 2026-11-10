@@ -2,7 +2,11 @@
 
 Each directory here is one calibration case. It holds a small synthetic target in `target/`, and the ledger a correct Monocle run should produce in `expected.json`. Use `tests/grade_report.py` to grade a report against a case, and `tests/run_live.py` to produce reports with a real agent. `TESTING.md` explains when to run them and how to record results.
 
-The targets are deliberately flawed. They are written to be harmless if someone runs one anyway: no `sudo`, no network except `.invalid` hosts, and no deletes outside the script's own temporary directory. Never deploy them.
+The targets are deliberately flawed, and they are review input only. Never run or deploy them: several act on the machine that runs them, with or without `sudo`.
+
+- `gated-removal` and `blank-gate-everything` delete app bundles from `/Applications`. With no arguments, `blank-gate-everything` deletes all three.
+- `jamf-param-secret` sends an API credential to whatever host Parameter 4 names.
+- `shared-tmp-chown` and `refuted-tmp` write files outside their own temporary directory.
 
 | Case | What it tests |
 |---|---|
@@ -32,7 +36,7 @@ The targets are deliberately flawed. They are written to be harmless if someone 
 | `expect.alternate_score_range` | Optional: the alternate score's range |
 | `expect.overall_risk` | A severity, or a list of acceptable severities |
 | `expect.no_other_findings` | `true` fails any unexpected Low or higher finding; `false` lists them as `extra` |
-| `expect.findings[]` | `class` (defect class, or a list), `file`, optional `function`, `severity` (or a list), optional `alternate`, `rationale` |
+| `expect.findings[]` | `class` (defect class, or a list), `file`, optional `function`, `severity` (or a list), optional `alternate`, `rationale`. `function` is a string or a list of alternatives; a row matches when any of them appears in its key's function or anchor (any case). Two findings in one file and defect class need distinct `function` selectors |
 | `expect.not_scored[]` | `reason` (a reason code), optional `class`, `rationale` |
 | `expect.refuted[]` | Informational: a candidate a good run may list under Refuted candidates |
 | `expect.must_not_flag[]` | `class`, `file`, optional `min_severity` (default Low), `rationale`: a finding here is a false positive |

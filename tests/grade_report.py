@@ -4,8 +4,9 @@
 Fixtures live in tests/fixtures/<case>/: a small synthetic target in target/, and the
 ledger a correct run should produce in expected.json (see tests/fixtures/README.md).
 The grader matches the report's Security findings to the expected rows by the issue
-keys in the report's Scope caveats (file and defect class), then checks severities,
-alternates, Not scored reason codes, the score range, the band, and Overall risk.
+keys in the report's Scope caveats (file, defect class, and an optional function or
+anchor selector), then checks severities, alternates, Not scored reason codes, the score
+range, the band, and Overall risk. Two rows with one key fail: one issue counted twice.
 
 The report is untrusted input: it is parsed with monocle/scripts/verify_report.py, and
 nothing in it reaches a shell. Everything printed passes through that script's
@@ -76,6 +77,34 @@ def same_file(reported, expected):
     return Path(reported).name == Path(expected).name
 
 
+def norm_path(path):
+    """A key's file part without a leading ./, so `./tool.zsh` and `tool.zsh` compare equal."""
+    path = (path or "").strip()
+    while path.startswith("./"):
+        path = path[2:]
+    return path
+
+
+def norm_where(where):
+    """A key's function or anchor without quotes, case, or repeated spaces."""
+    return re.sub(r"\s+", " ", re.sub(r"[`'\"]", "", where or "")).strip().casefold()
+
+
+def identity_key(row):
+    """What makes two keyed items the same issue: normalized file, function or anchor, and defect class."""
+    if not row.get("class"):
+        return (row.get("key") or "").strip() or None
+    return norm_path(row["file"]), norm_where(row["where"]), row["class"]
+
+
+def where_matches(where, selectors):
+    """True when no selector is given, or when any selector appears in the function or anchor (any case)."""
+    if not selectors:
+        return True
+    text = (where or "").casefold()
+    return any(selector.casefold() in text for selector in as_list(selectors))
+
+
 def split_key(key):
     """Return (file, function or anchor, defect class) for a key, or Nones when it doesn't parse."""
     match = vr.KEY_RE.match(key or "")
@@ -139,8 +168,8 @@ def facts(report_text):
     refuted = []
     for entry in nested_bullets(report.body("Scope"), "- **Refuted candidates.**"):
         key = re.split(r"\s+—\s+", entry, maxsplit=1)[0].strip("` ")
-        file_part, _, cls = split_key(key)
-        refuted.append({"key": key, "file": file_part, "class": cls})
+        file_part, where, cls = split_key(key)
+        refuted.append({"key": key, "file": file_part, "where": where, "class": cls})
 
     failed = [f"{c.group}: {c.name} — {c.detail}" for c in audit.checks
               if c.status == "fail" and c.group in ("structure", "rules", "arithmetic")]
@@ -176,18 +205,32 @@ def grade(report_text, expected):
         add("note", "the report has no Issue keys bullet, so findings can't be matched by file and class")
 
     security = [row for row in report["rows"].values() if row["id"].startswith("S")]
-    matched = set()
+    sharing = {}
+    for row in security:
+        if identity_key(row):
+            sharing.setdefault(identity_key(row), []).append(row)
+    for rows in sharing.values():
+        if len(rows) > 1:
+            add("fail", f"{', '.join(row['id'] for row in rows)} share the issue key `{rows[0]['key']}`: "
+                        "one issue counted twice (distinct-issue test)")
+
+    matched, matched_keys = set(), set()
     for number, want in enumerate(expect.get("findings", []), 1):
-        label = f"finding {number} ({'/'.join(as_list(want['class']))} in {want['file']}, {'/'.join(as_list(want['severity']))})"
-        candidates = [row for row in security if row["id"] not in matched and row["class"] in as_list(want["class"])
-                      and row["file"] and same_file(row["file"], want["file"])
-                      and (not want.get("function") or want["function"] in (row["where"] or ""))]
+        at = f" at {'/'.join(as_list(want['function']))}" if want.get("function") else ""
+        label = (f"finding {number} ({'/'.join(as_list(want['class']))} in {want['file']}{at}, "
+                 f"{'/'.join(as_list(want['severity']))})")
+        same_place = [row for row in security if row["id"] not in matched and identity_key(row) not in matched_keys
+                      and row["class"] in as_list(want["class"]) and row["file"] and same_file(row["file"], want["file"])]
+        candidates = [row for row in same_place if where_matches(row["where"], want.get("function"))]
         if not candidates:
-            add("miss", f"{label}: no matching row")
+            near = ", ".join(f"{row['id']} `{row['key']}`" for row in same_place)
+            add("miss", f"{label}: no matching row" +
+                (f"; same file and class, another function or anchor: {near}" if near else ""))
             continue
         best = min(candidates, key=lambda row: (distance(row["severity"], want["severity"]) is None,
                                                 distance(row["severity"], want["severity"]) or 0))
         matched.add(best["id"])
+        matched_keys.add(identity_key(best))
         gap = distance(best["severity"], want["severity"])
         status = "exact" if gap == 0 else "adjacent" if gap == 1 else "off"
         add(status, f"{label}: {best['id']} is {best['severity']} (`{best['key']}`)")
@@ -257,35 +300,75 @@ def grade(report_text, expected):
 
 
 def compare(text_a, text_b):
+    """Compare the ledgers of two reports on one target.
+
+    Rows pair by exact key, then by normalized file, function or anchor, and class. A row
+    left over pairs with the only leftover of the same file, class, and disposition on the
+    other side, and the changed key is itself a difference: keys must stay stable across
+    runs (scoring-procedure.md). Dispositions, Not scored reasons, and refuted candidates
+    are compared too.
+    """
     a, b = facts(text_a), facts(text_b)
     differences = []
 
     def identity(row):
         return row["key"] or row["id"]
 
-    rows_b = dict(b["rows"])
-    for ident, row in a["rows"].items():
-        twin = next((other for other in rows_b.values() if row["key"] and other["key"] == row["key"]), None)
-        if twin is None:
-            twin = next((other for other in rows_b.values() if row["class"] and other["class"] == row["class"]
-                         and other["file"] and row["file"] and same_file(other["file"], row["file"])
-                         and other["id"][0] == ident[0]), None)
-        if twin is None:
-            differences.append(f"only in A: {ident} {row['severity'] or ''} `{identity(row)}`".replace("  ", " "))
-            continue
-        rows_b.pop(twin["id"])
+    def exact(row):
+        return (row["key"] or "").strip() or None
+
+    def loose(row):
+        return (norm_path(row["file"]), row["class"], row["id"][0]) if row["class"] else None
+
+    rows_a, rows_b = dict(a["rows"]), dict(b["rows"])
+    pairs = []
+    for tier in (exact, lambda row: identity_key(row) if row["class"] else None):
+        for ident, row in list(rows_a.items()):
+            value = tier(row)
+            twin = next((other for other in rows_b.values() if value and tier(other) == value), None)
+            if twin:
+                pairs.append((row, twin, False))
+                rows_a.pop(ident)
+                rows_b.pop(twin["id"])
+    for ident, row in list(rows_a.items()):
+        value = loose(row)
+        mine = [other for other in rows_a.values() if value and loose(other) == value]
+        theirs = [other for other in rows_b.values() if value and loose(other) == value]
+        if len(mine) == 1 and len(theirs) == 1:
+            pairs.append((row, theirs[0], True))
+            rows_a.pop(ident)
+            rows_b.pop(theirs[0]["id"])
+
+    for row in rows_a.values():
+        differences.append(f"only in A: {row['id']} {row['severity'] or ''} `{identity(row)}`".replace("  ", " "))
+    for row, twin, rekeyed in pairs:
+        if rekeyed:
+            differences.append(f"key changed: `{row['key']}` in A ({row['id']}), `{twin['key']}` in B ({twin['id']})")
+        if row["id"][0] != twin["id"][0]:
+            differences.append(f"disposition: `{identity(row)}` is {row['id']} in A, {twin['id']} in B")
         if twin["severity"] != row["severity"]:
-            differences.append(f"severity: `{identity(row)}` is {row['severity']} in A ({ident}), "
+            differences.append(f"severity: `{identity(row)}` is {row['severity']} in A ({row['id']}), "
                                f"{twin['severity']} in B ({twin['id']})")
-        alt_a, alt_b = a["alternates"].get(ident), b["alternates"].get(twin["id"])
+        alt_a, alt_b = a["alternates"].get(row["id"]), b["alternates"].get(twin["id"])
         if alt_a != alt_b:
             differences.append(f"alternate: `{identity(row)}` is {alt_a or 'none'} in A, {alt_b or 'none'} in B")
-    for ident, row in rows_b.items():
-        differences.append(f"only in B: {ident} {row['severity'] or ''} `{identity(row)}`".replace("  ", " "))
+        if row["id"][0] == twin["id"][0] == "X":
+            reason_a, reason_b = a["reasons"].get(row["id"]), b["reasons"].get(twin["id"])
+            if reason_a != reason_b:
+                differences.append(f"Not scored reason: `{identity(row)}` is {reason_a or 'none'} in A, "
+                                   f"{reason_b or 'none'} in B")
+    for row in rows_b.values():
+        differences.append(f"only in B: {row['id']} {row['severity'] or ''} `{identity(row)}`".replace("  ", " "))
+
     for field_name, label_text in (("final", "score"), ("band", "band"), ("alternate_score", "alternate score"),
                                    ("overall_risk", "Overall risk")):
         if a[field_name] != b[field_name]:
             differences.append(f"{label_text}: {a[field_name]} in A, {b[field_name]} in B")
+
+    refuted_a = {identity_key(entry): entry["key"] for entry in a["refuted"] if identity_key(entry)}
+    refuted_b = {identity_key(entry): entry["key"] for entry in b["refuted"] if identity_key(entry)}
+    differences += [f"refuted only in A: `{key}`" for value, key in refuted_a.items() if value not in refuted_b]
+    differences += [f"refuted only in B: `{key}`" for value, key in refuted_b.items() if value not in refuted_a]
     return {"identical": not differences, "score_a": a["final"], "score_b": b["final"], "differences": differences}
 
 
@@ -357,12 +440,38 @@ def validate_fixture(case_dir):
             for key in ("severity", "alternate", "min_severity"):
                 if key in row and not set(as_list(row[key])) <= set(vr.SEVERITIES):
                     problems.append(f"{where}: {key} must be a severity name")
+            if "function" in row and not (
+                    (isinstance(row["function"], str) and row["function"].strip())
+                    or (isinstance(row["function"], list) and row["function"]
+                        and all(isinstance(item, str) and item.strip() for item in row["function"]))):
+                problems.append(f"{where}: function must be a string or a list of strings")
             if "reason" in row and row["reason"] not in REASON_CODES:
                 problems.append(f"{where}: reason must be a reason code from scoring-procedure.md")
             if "file" in row and row["file"] not in shipped:
                 problems.append(f"{where}: {row['file']} isn't in target/")
             if not str(row.get("rationale", "")).strip():
                 problems.append(f"{where}: rationale must say why, citing the Decision procedure")
+    findings = expect.get("findings")
+    return problems + (overlapping_findings(name, findings) if isinstance(findings, list) else [])
+
+
+def overlapping_findings(name, findings):
+    """Expected findings that share a file and a defect class need distinct function selectors.
+
+    Without them, two rows about one exposure can satisfy both expectations while the other is missing.
+    """
+    problems = []
+    rows = [(number, row) for number, row in enumerate(findings, 1) if isinstance(row, dict)]
+    for index, (first_number, first) in enumerate(rows):
+        for second_number, second in rows[index + 1:]:
+            if first.get("file") != second.get("file"):
+                continue
+            if not set(map(str, as_list(first.get("class")))) & set(map(str, as_list(second.get("class")))):
+                continue
+            first_sel, second_sel = first.get("function"), second.get("function")
+            if not first_sel or not second_sel or set(map(str, as_list(first_sel))) & set(map(str, as_list(second_sel))):
+                problems.append(f"{name}: expect.findings[{first_number}] and [{second_number}] share a file and "
+                                "defect class; give each a distinct function selector")
     return problems
 
 
@@ -403,6 +512,13 @@ def self_test():
         "**Operator baseline:**\n\n- Parameter 4 is set (README.md:5) (S1 → 🟠 High if not); check: none available")
     extra_low = vr.synthetic_report(rules, high=1, medium=0, low=1, info=0, nonsec=0,
                                     keys={"S1": "prep.zsh:summary · shared-path", "S2": "prep.zsh:log · disclosure"})
+
+    def two_high(second_key):
+        return vr.synthetic_report(rules, high=2, medium=0, low=0, info=0, nonsec=0,
+                                   keys={"S1": 'set.zsh:client_secret="$6" · secret-exposure', "S2": second_key})
+
+    secret = {"class": "secret-exposure", "file": "set.zsh", "severity": "High", "rationale": "r"}
+    by_selector = [dict(secret, function=["$6", "client_secret"]), dict(secret, function=["bearer", "$token"])]
     grade_cases = (
         ("matching report", base, expectation(), "PASS"),
         ("missed finding", base, expectation(findings=[{"class": "injection", "file": "prep.zsh",
@@ -425,6 +541,12 @@ def self_test():
                                                     overall_risk="Low",
                                                     findings=[{"class": "gate", "file": "apps.zsh", "severity": "Low",
                                                                "alternate": "Low", "rationale": "r"}]), "FAIL"),
+        ("two selectors, both rows present", two_high('set.zsh:--oauth2-bearer "$token" · secret-exposure'),
+         expectation(findings=by_selector), "PASS"),
+        ("two selectors, second row about the first exposure", two_high("set.zsh:printf client_secret · secret-exposure"),
+         expectation(findings=by_selector), "FAIL"),
+        ("two rows with one issue key", two_high('set.zsh:client_secret="$6" · secret-exposure'),
+         expectation(findings=[secret, secret]), "FAIL"),
     )
     for name, text, expected, wanted in grade_cases:
         verdict = grade(text, expected)["verdict"]
@@ -434,18 +556,38 @@ def self_test():
     if not any("recorded" in r["detail"] and "not recorded" not in r["detail"] for r in refuted["results"]):
         problems.append("grade, refuted candidate: the Refuted candidates entry wasn't read")
 
-    if not compare(base, base)["identical"]:
-        problems.append("compare: a report differs from itself")
+    if not overlapping_findings("self-test", [secret, secret]):
+        problems.append("fixture check: two expected findings in one file and class without selectors weren't caught")
+    if overlapping_findings("self-test", by_selector):
+        problems.append("fixture check: two expected findings with distinct selectors were rejected")
+
     medium = vr.synthetic_report(rules, high=0, medium=1, low=0, info=0, nonsec=0,
                                  keys={"S1": "prep.zsh:summary · shared-path"})
-    changed = compare(base, medium)
-    if changed["identical"] or not any(d.startswith("severity:") for d in changed["differences"]):
-        problems.append(f"compare: a severity change wasn't reported ({changed['differences']})")
+    renamed = base.replace("prep.zsh:summary · shared-path", "prep.zsh:cleanup · shared-path")
+    dotted = base.replace("`prep.zsh:summary · shared-path`", "`./prep.zsh:summary · shared-path`")
+    moved_to_x = vr.synthetic_report(rules, high=0, medium=0, low=0, info=0, nonsec=0,
+                                     keys={"X1": "prep.zsh:summary · shared-path"}).replace(
+        "| Not scored | — | 0 | 0 | 0 |", "| Not scored | X1 summary file (capability) | 1 | 0 | 0 |")
+    compare_cases = (
+        ("a report against itself", base, base, None),
+        ("a key that differs only by a leading ./", base, dotted, None),
+        ("a severity change", base, medium, "severity:"),
+        ("another function in the same file and class", base, renamed, "key changed:"),
+        ("a scored row that became Not scored", base, moved_to_x, "disposition:"),
+        ("a changed Not scored reason", with_x, with_x.replace("(capability)", "(unreachable)"), "Not scored reason:"),
+        ("a new refuted candidate", base, with_refuted, "refuted only in B:"),
+    )
+    for name, text_a, text_b, wanted in compare_cases:
+        result = compare(text_a, text_b)
+        if wanted is None and not result["identical"]:
+            problems.append(f"compare, {name}: expected identical ledgers, got {result['differences']}")
+        elif wanted and (result["identical"] or not any(d.startswith(wanted) for d in result["differences"])):
+            problems.append(f"compare, {name}: expected a '{wanted}' difference, got {result['differences']}")
 
     for problem in problems:
         print(vr.safe_text(f"FAIL {problem}"))
-    print(f"self-test: {len(cases)} fixtures validated, {len(grade_cases) + 1} grading cases, 2 compare cases — "
-          f"{'all passed' if not problems else f'{len(problems)} problem(s)'}")
+    print(f"self-test: {len(cases)} fixtures validated, {len(grade_cases) + 1} grading cases, "
+          f"{len(compare_cases)} compare cases — {'all passed' if not problems else f'{len(problems)} problem(s)'}")
     return 1 if problems else 0
 
 
